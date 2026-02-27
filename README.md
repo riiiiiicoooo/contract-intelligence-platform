@@ -224,6 +224,4 @@ This repository documents a product I built as **Principal Product Manager** for
 
 **Note:** Client-identifying details have been anonymized. Metrics and architecture reflect the actual production system.
 
----
 
-*Built by [Jacob George](https://linkedin.com/in/jacob-g-17630a127) - Product Manager specializing in AI-powered platforms, marketplace products, and enterprise SaaS.*
