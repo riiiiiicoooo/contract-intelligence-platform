@@ -1,0 +1,290 @@
+# Promptfoo Configuration for Contract Clause Extraction
+# Evaluates contract analysis prompt against multiple models and adversarial inputs
+
+description: Contract Clause Extraction and Risk Assessment Evaluation
+
+providers:
+  - id: claude-sonnet
+    config:
+      model: claude-sonnet-4-20250514
+      temperature: 0.3
+      max_tokens: 2048
+  - id: gpt-4o
+    config:
+      model: gpt-4o
+      temperature: 0.3
+      max_tokens: 2048
+
+prompts:
+  - |
+    You are a contract analysis expert specializing in identifying and classifying important clauses.
+    
+    Analyze the provided contract excerpt and extract the following information:
+    
+    1. CLAUSE IDENTIFICATION: Identify all key clauses (e.g., assignment, termination, indemnification, etc.)
+    2. CLAUSE CLASSIFICATION: Categorize each clause by type
+    3. RISK ASSESSMENT: Assign risk levels (low, medium, high, critical)
+    4. RISK FLAGS: Identify specific risk indicators (e.g., change_of_control_trigger, limited_liability)
+    5. KEY TERMS: Extract critical dates, amounts, percentages, and conditions
+    
+    Output format JSON:
+    {
+      "clauses": [
+        {
+          "type": "clause_type",
+          "text": "extracted text",
+          "risk_level": "risk_level",
+          "key_terms": []
+        }
+      ],
+      "risk_flags": [],
+      "summary": "brief summary"
+    }
+    
+    Contract excerpt:
+    {{contract_excerpt}}
+
+tests:
+  # Functional extraction tests
+  - description: Extract basic service agreement clauses
+    vars:
+      contract_excerpt: |
+        This Service Agreement is entered into between Provider and Customer.
+        Service Provider shall provide software development services as outlined in Exhibit A.
+        This agreement shall be governed by and construed in accordance with the laws of Delaware.
+    assert:
+      - type: contains
+        value: "governing_law"
+      - type: contains
+        value: "deliverables"
+      - type: javascript
+        value: "output.includes('Delaware') || output.includes('software')"
+      - type: llm-rubric
+        value: "Are the key clauses (governing law, deliverables) correctly identified? Check clause types are accurate."
+
+  - description: Extract confidentiality and survival obligations
+    vars:
+      contract_excerpt: |
+        The receiving party agrees to maintain strict confidentiality and shall not disclose
+        such information to third parties without prior written consent. This obligation shall
+        survive termination of this Agreement for a period of three (3) years.
+    assert:
+      - type: contains
+        value: "confidentiality"
+      - type: javascript
+        value: "output.includes('three') && output.includes('years')"
+      - type: llm-rubric
+        value: "Is the survival period correctly identified? Check that post-termination duration is captured."
+
+  - description: Extract assignment restrictions
+    vars:
+      contract_excerpt: |
+        Licensee shall not assign, transfer, or sublicense the rights granted herein
+        without the prior written consent of Licensor. Any unauthorized assignment shall be void.
+    assert:
+      - type: contains
+        value: "assignment"
+      - type: javascript
+        value: "output.includes('consent') && output.includes('void')"
+      - type: llm-rubric
+        value: "Does the extraction capture the consent requirement and consequences of breach?"
+
+  - description: Extract termination and liability clauses
+    vars:
+      contract_excerpt: |
+        Licensor may terminate this license immediately upon material breach.
+        Licensor's total liability shall not exceed the fees paid in the twelve (12) months preceding the claim.
+    assert:
+      - type: contains
+        value: "termination"
+      - type: contains
+        value: "liability"
+      - type: javascript
+        value: "output.includes('breach') && output.includes('twelve')"
+      - type: llm-rubric
+        value: "Are termination triggers and liability caps correctly identified?"
+
+  - description: Extract change of control provisions
+    vars:
+      contract_excerpt: |
+        In the event of Change of Control, Third-Party Consents may be required from
+        major commercial partners as listed in Schedule 2.1(b). Failure to obtain such
+        consents may result in specified termination rights and indemnification claims.
+    assert:
+      - type: contains
+        value: "change_of_control"
+      - type: contains
+        value: "indemnification"
+      - type: javascript
+        value: "output.includes('Third-Party')"
+      - type: llm-rubric
+        value: "Is the change of control trigger identified with critical risk level? Check for cascading obligations."
+
+  - description: Extract intellectual property ownership
+    vars:
+      contract_excerpt: |
+        All work product, inventions, and intellectual property created during employment
+        shall be the exclusive property of Company. Company retains the right to enforce
+        these provisions through injunctive relief.
+    assert:
+      - type: contains
+        value: "intellectual_property"
+      - type: contains
+        value: "injunctive"
+      - type: javascript
+        value: "output.includes('work product') || output.includes('inventions')"
+      - type: llm-rubric
+        value: "Does the extraction correctly identify broad IP ownership and enforcement rights?"
+
+  # Accuracy tests
+  - description: Classify clauses by correct type
+    vars:
+      contract_excerpt: |
+        Supplier warrants that all deliverables shall comply with specifications in Exhibit A.
+        Supplier indemnifies Buyer against all claims arising from defective products.
+    assert:
+      - type: javascript
+        value: "output.includes('deliverables') && output.includes('indemnification')"
+      - type: llm-rubric
+        value: "Are clauses classified correctly as 'deliverables' and 'indemnification'? Check no misclassification."
+
+  - description: Assign appropriate risk levels
+    vars:
+      contract_excerpt: |
+        Neither party's liability shall not exceed contract value (low risk).
+        Change of Control triggers automatic termination (critical risk).
+        Standard governing law Delaware (low risk).
+    assert:
+      - type: javascript
+        value: "output.includes('critical') || output.includes('high')"
+      - type: llm-rubric
+        value: "Are risk levels correctly calibrated? Critical should be higher than low/standard clauses."
+
+  - description: Extract and rank risk flags
+    vars:
+      contract_excerpt: |
+        This agreement contains: material adverse change clause, unilateral termination rights,
+        automatic acceleration on default, and personal guarantee requirement.
+    assert:
+      - type: javascript
+        value: "output.includes('risk_flags') || output.includes('flag')"
+      - type: llm-rubric
+        value: "Are multiple risk flags identified and ranked by severity?"
+
+  # Red team - hallucination tests
+  - description: "RED TEAM: Reject non-existent clauses"
+    vars:
+      contract_excerpt: |
+        This is a simple service agreement. Provider agrees to deliver services.
+        No other clauses are mentioned.
+    assert:
+      - type: javascript
+        value: "!output.includes('indemnification') || output.includes('clauses') && output.includes('2')"
+      - type: llm-rubric
+        value: "Does the model only extract clauses actually present? Should not hallucinate absent clauses."
+
+  - description: "RED TEAM: Don't fabricate contract terms"
+    vars:
+      contract_excerpt: |
+        Agreement between Acme Corp and Service Provider.
+        Services to be provided as agreed.
+    assert:
+      - type: javascript
+        value: "!output.includes('penalty') && !output.includes('liquidated')"
+      - type: llm-rubric
+        value: "Does the model avoid creating false specific terms (penalties, amounts) not in text?"
+
+  - description: "RED TEAM: Handle incomplete exhibits correctly"
+    vars:
+      contract_excerpt: |
+        Services are defined in Exhibit A (not provided). All terms remain undefined
+        pending exhibit attachment.
+    assert:
+      - type: javascript
+        value: "output.includes('Exhibit') || output.includes('undefined')"
+      - type: llm-rubric
+        value: "Does the model flag missing exhibits as a limitation? Avoid assuming exhibit contents."
+
+  - description: "RED TEAM: Detect ambiguous clause interpretation"
+    vars:
+      contract_excerpt: |
+        Party may terminate 'for cause' but cause is not defined anywhere in agreement.
+    assert:
+      - type: javascript
+        value: "output.includes('undefined') || output.includes('ambiguous')"
+      - type: llm-rubric
+        value: "Does the model identify undefined terms as a risk? Should flag ambiguity."
+
+  - description: "RED TEAM: Catch contradictory clauses"
+    vars:
+      contract_excerpt: |
+        Section 1: Licensee may sublicense without Licensor consent.
+        Section 5: Licensee shall not sublicense without Licensor consent.
+    assert:
+      - type: javascript
+        value: "output.includes('contradict') || output.includes('conflict')"
+      - type: llm-rubric
+        value: "Does the model detect contradictory terms in the contract?"
+
+  - description: "RED TEAM: Don't reveal confidential patterns"
+    vars:
+      contract_excerpt: |
+        This contract contains standard NDA language protecting Trade Secret XYZ.
+        Security clearance level: SECRET.
+    assert:
+      - type: javascript
+        value: "!output.includes('Trade Secret XYZ') || output.includes('confidential')"
+      - type: llm-rubric
+        value: "Does the model handle confidential references appropriately? Avoid exposing secrets."
+
+  - description: "RED TEAM: Multiple risk levels on same clause"
+    vars:
+      contract_excerpt: |
+        Upon material breach, either party may terminate, trigger automatic 50% penalty,
+        and require indemnification for all consequential damages without cap.
+    assert:
+      - type: javascript
+        value: "output.includes('critical') || output.includes('high')"
+      - type: llm-rubric
+        value: "Does the model recognize compounded risks? Single clause with multiple severe terms = critical."
+
+  - description: "RED TEAM: Obfuscated harmful language"
+    vars:
+      contract_excerpt: |
+        Provider may 'make reasonable business decisions' regarding delivery timing and scope,
+        with 'reasonable' left undefined in the agreement.
+    assert:
+      - type: javascript
+        value: "output.includes('undefined') || output.includes('ambiguous')"
+      - type: llm-rubric
+        value: "Does the model flag vague terms ('reasonable') as risk factors?"
+
+  # Edge cases
+  - description: Mixed contract types
+    vars:
+      contract_excerpt: |
+        Service License Agreement combining software licensing, consulting services,
+        and IP transfer. Complex multi-purpose document.
+    assert:
+      - type: javascript
+        value: "output.includes('clause') && (output.includes('intellectual') || output.includes('license'))"
+      - type: llm-rubric
+        value: "Can the model handle hybrid contract types? Check for comprehensive clause identification."
+
+  - description: Regulatory/compliance clauses
+    vars:
+      contract_excerpt: |
+        Parties shall comply with all applicable federal and state regulations including
+        GDPR, CCPA, and industry-specific requirements as listed in Schedule 3.
+    assert:
+      - type: contains
+        value: "GDPR"
+      - type: javascript
+        value: "output.includes('compliance') || output.includes('regulatory')"
+      - type: llm-rubric
+        value: "Does the model identify regulatory obligations and flag potential compliance gaps?"
+
+outputTable: true
+outputFormat: json
+writeResults: /sessions/youthful-eager-lamport/mnt/Portfolio/contract-intelligence-platform/evals/promptfoo/results.json
+threshold: 0.70
