@@ -1,0 +1,121 @@
+{
+  "projectSettings": {
+    "sourceFilesOutsideRootDirectory": true
+  },
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "functions": {
+    "api/**/*.ts": {
+      "memory": 3008,
+      "maxDuration": 300
+    }
+  },
+  "env": [
+    {
+      "key": "SUPABASE_URL",
+      "type": "plaintext",
+      "value": "https://your-project.supabase.co"
+    },
+    {
+      "key": "SUPABASE_KEY",
+      "type": "secret"
+    },
+    {
+      "key": "CLERK_SECRET_KEY",
+      "type": "secret"
+    },
+    {
+      "key": "CLERK_PUBLISHABLE_KEY",
+      "type": "plaintext"
+    },
+    {
+      "key": "LANGSMITH_API_KEY",
+      "type": "secret"
+    },
+    {
+      "key": "ANTHROPIC_API_KEY",
+      "type": "secret"
+    },
+    {
+      "key": "OPENAI_API_KEY",
+      "type": "secret"
+    },
+    {
+      "key": "VOYAGE_API_KEY",
+      "type": "secret"
+    },
+    {
+      "key": "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT",
+      "type": "plaintext"
+    },
+    {
+      "key": "AZURE_DOCUMENT_INTELLIGENCE_KEY",
+      "type": "secret"
+    },
+    {
+      "key": "TRIGGER_API_KEY",
+      "type": "secret"
+    },
+    {
+      "key": "N8N_WEBHOOK_URL",
+      "type": "plaintext"
+    },
+    {
+      "key": "RESEND_API_KEY",
+      "type": "secret"
+    },
+    {
+      "key": "SLACK_WEBHOOK_URL",
+      "type": "secret"
+    }
+  ],
+  "middleware": [
+    {
+      "src": "/middleware.ts",
+      "dest": "/"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, must-revalidate"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/dashboard",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/docs",
+      "destination": "/api/swagger"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/extraction-monitoring",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/deal-summary-email",
+      "schedule": "0 9 MON *"
+    }
+  ]
+}

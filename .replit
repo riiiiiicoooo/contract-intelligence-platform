@@ -1,0 +1,32 @@
+# Replit configuration for Contract Intelligence Platform
+
+run = "python -m uvicorn src.api.main:app --host 0.0.0.0 --port 3000 --reload"
+
+[nix]
+channel = "unstable"
+
+[env]
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_KEY = "your-anon-key"
+CLERK_SECRET_KEY = "your-clerk-secret"
+LANGSMITH_API_KEY = "your-langsmith-api-key"
+OPENAI_API_KEY = "your-openai-api-key"
+ANTHROPIC_API_KEY = "your-anthropic-api-key"
+VOYAGE_API_KEY = "your-voyage-api-key"
+AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT = "https://your-region.api.cognitive.microsoft.com/"
+AZURE_DOCUMENT_INTELLIGENCE_KEY = "your-azure-key"
+
+[packager]
+language = "python310"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[[ports]]
+localPort = 5432
+externalPort = 5432
+
+[[ports]]
+localPort = 8080
+externalPort = 8080

@@ -6,6 +6,139 @@ An intelligent document processing platform that transforms how deal teams analy
 
 ---
 
+## Modern Stack (Production Infrastructure)
+
+This project includes comprehensive modern tooling infrastructure for production-grade deployment:
+
+### AI & Observability
+- **LangSmith Tracing** - Distributed tracing for all LLM calls with @traceable decorators
+- **Custom Evaluators** - Clause extraction accuracy (F1 >= 0.94), risk flag precision (>= 0.90), hallucination detection
+- **Evaluation Datasets** - Sample contracts with ground-truth clause extractions and expected risk flags
+- **Cost Tracking** - Per-extraction token counting and cost aggregation by contract type
+
+### Async Job Processing
+- **Trigger.dev** - Long-running contract extraction jobs (2-10 min/document) with checkpointing between stages
+- **Batch Deal Analysis** - Fan-out extraction, fan-in aggregation, portfolio pattern detection
+- **Error Handling** - Retry logic with exponential backoff and dead-letter queue
+
+### Workflow Automation
+- **n8n Workflows** - Two production workflows:
+  - **deal_room_ingestion.json** - Document webhook → classify → extract → notify analyst
+  - **extraction_monitoring.json** - Hourly LangSmith audit → quality metrics → Slack/email alerts (>5% error rate)
+
+### Authentication & Authorization
+- **Clerk Integration** - SSO, SAML, passwordless auth with role-based middleware
+- **Next.js Middleware** - Route protection, role-based access control (Partner/Associate/Analyst)
+- **Tenant Isolation** - Organization-based data boundaries enforced at middleware + database level
+
+### Database & Migrations
+- **Supabase PostgreSQL** - Managed PostgreSQL with pgvector, RLS policies, and storage buckets
+- **Migration System** - Supabase-compatible DDL with tenant-level RLS policies for each table
+- **Vector Search** - HNSW indexes (m=16, ef_construction=128) for 50M+ scale semantic similarity
+
+### Email & Notifications
+- **React Email Templates** - TypeScript/JSX email components:
+  - **extraction_complete.tsx** - Contract extraction summary with risk flag counts, confidence, action items
+  - **deal_summary.tsx** - Weekly deal progress digest with risk matrix, pending reviews, action items
+- **Resend** - Transactional email delivery with click tracking
+- **Slack Webhooks** - Real-time alerts for extraction quality degradation
+
+### Configuration & Deployment
+- **.cursorrules** - Comprehensive Cursor AI context (architecture, tech stack, design decisions, conventions)
+- **.replit + replit.nix** - Replit cloud development environment with PostgreSQL and Node.js
+- **vercel.json** - Vercel deployment configuration with edge caching, API function sizing, cron jobs
+- **.env.example** - Template for all environment variables (organized by service)
+
+### Architecture Diagram
+
+```
+                    Analyst Dashboard (Next.js)
+                           │
+                           ▼
+         ┌─────────────────────────────────────┐
+         │  Clerk Auth (SSO) + Middleware      │
+         │  Role-based route protection        │
+         └─────────────────┬───────────────────┘
+                           │
+        ┌──────────────────┼──────────────────┐
+        ▼                  ▼                  ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│   n8n        │ │ Trigger.dev  │ │ Supabase API │
+│ Workflows    │ │ Jobs         │ │ GraphQL      │
+│              │ │              │ │              │
+│ - Ingestion  │ │ - Extract    │ │ - Auth       │
+│ - Monitoring │ │ - Analyze    │ │ - Storage    │
+└──────────────┘ └──────────────┘ └──────────────┘
+        │              │                  │
+        └──────────────┬──────────────────┘
+                       ▼
+         ┌──────────────────────────────┐
+         │ Supabase (PostgreSQL)        │
+         │ - pgvector (embeddings)      │
+         │ - RLS policies (tenant iso)  │
+         │ - Storage buckets (docs)     │
+         └──────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        ▼              ▼              ▼
+    ┌────────┐   ┌─────────┐   ┌──────────┐
+    │Anthropic│   │OpenAI   │   │Voyage    │
+    │Claude   │   │GPT-4    │   │law-2     │
+    │API      │   │API      │   │API       │
+    └────────┘   └─────────┘   └──────────┘
+        │              │              │
+        └──────────────┼──────────────┘
+                       ▼
+         ┌──────────────────────────────┐
+         │ LangSmith Observability      │
+         │ - Tracing (@traceable)       │
+         │ - Custom evaluators          │
+         │ - Cost tracking              │
+         │ - Dataset management         │
+         └──────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        ▼              ▼              ▼
+    ┌──────────┐  ┌────────┐  ┌──────────┐
+    │Slack     │  │Resend  │  │Metrics   │
+    │Webhooks  │  │Email   │  │Dashboard │
+    └──────────┘  └────────┘  └──────────┘
+```
+
+### Quick Start (Infrastructure)
+
+1. **Clone and configure environment:**
+   ```bash
+   cp .env.example .env.local
+   # Fill in API keys and endpoints
+   ```
+
+2. **Initialize database:**
+   ```bash
+   npx supabase db push
+   # Applies migrations from supabase/migrations/
+   ```
+
+3. **Set up authentication:**
+   - Create Clerk organization and configure SAML/SSO
+   - Middleware in `/clerk/middleware.ts` enforces role-based access
+
+4. **Configure workflows:**
+   - Import n8n workflows from `/n8n/` directory
+   - Create Slack and Resend webhooks
+
+5. **Deploy Trigger.dev jobs:**
+   - Configure TypeScript jobs in `/trigger-jobs/`
+   - Set up webhook endpoints in n8n for job triggering
+
+6. **Deploy to Vercel:**
+   ```bash
+   vercel deploy
+   # Uses vercel.json for API function sizing, crons, environment variables
+   ```
+
+---
+
 ## The Problem
 
 During M&A due diligence, deal teams manually review 200–500+ contracts per transaction. Associates spend 3–4 weeks reading contracts line by line, extracting terms into spreadsheets, and flagging risk provisions. This process is:

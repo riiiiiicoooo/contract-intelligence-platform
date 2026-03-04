@@ -1,0 +1,113 @@
+MASTER SERVICE AGREEMENT
+
+This Master Service Agreement ("Agreement") is entered into effective March 1, 2024 ("Effective Date"),
+between Acme Corporation, a Delaware corporation ("Client"), and Target Industries LLC, a New York
+limited liability company ("Service Provider").
+
+RECITALS
+
+WHEREAS, Service Provider provides professional consulting and software development services;
+
+WHEREAS, Client desires to engage Service Provider to provide services under this Agreement;
+
+NOW, THEREFORE, in consideration of the mutual covenants and agreements contained herein:
+
+SECTION 1: SERVICES
+Service Provider shall provide consulting, architecture, and software development services as
+detailed in Statements of Work ("SOWs") executed under this Agreement.
+
+SECTION 2: TERM
+This Agreement shall commence on the Effective Date and continue until December 31, 2026, unless
+earlier terminated pursuant to Section 5. This Agreement shall automatically renew for successive
+one-year terms unless either party provides ninety (90) days written notice of non-renewal prior
+to the then-current expiration date.
+
+SECTION 3: PAYMENT TERMS
+3.1 Fee Structure. Client shall pay Service Provider the fees set forth in each SOW executed
+hereunder. Fees are based on time-and-materials unless otherwise specified in an SOW.
+
+3.2 Invoicing. Service Provider shall invoice Client upon completion of services or on a monthly
+basis as set forth in each SOW. Invoices shall be due net thirty (30) days from receipt. Late
+payments accrue interest at 1.5% per month or the maximum lawful rate, whichever is less.
+
+SECTION 4: CONFIDENTIALITY
+Each party agrees to maintain confidentiality of the other's proprietary information and not
+disclose it to third parties without prior written consent. Confidentiality obligations shall
+survive termination of this Agreement for a period of three (3) years.
+
+SECTION 5: TERMINATION
+5.1 Termination for Convenience. Either party may terminate this Agreement for convenience upon
+thirty (30) days written notice to the other party. Upon such termination, Client shall pay Service
+Provider for all services performed through the effective date of termination.
+
+5.2 Termination for Cause. Either party may terminate this Agreement immediately upon written
+notice if the other party materially breaches this Agreement and fails to cure such breach within
+thirty (30) days of receiving written notice thereof.
+
+SECTION 6: INDEPENDENT CONTRACTORS
+Service Provider is an independent contractor, not an employee of Client. Service Provider is
+responsible for all taxes and withholdings related to compensation hereunder.
+
+SECTION 7: INTELLECTUAL PROPERTY
+7.1 Work Product Ownership. All work product created by Service Provider under this Agreement
+shall be owned by Client upon payment of fees, unless otherwise specified in an SOW.
+
+7.2 Service Provider IP. Service Provider retains all intellectual property rights in its
+pre-existing tools, methodologies, and platforms used in providing services, provided such are
+not derived from Client's confidential information.
+
+SECTION 8: ASSIGNMENT AND CHANGE OF CONTROL
+Neither party may assign this Agreement without the other's prior written consent, except for
+assignments to affiliates. In the event of a Change of Control of either party (meaning:
+(a) acquisition of more than fifty percent (50%) of voting securities;
+(b) merger or consolidation in which the party does not continue to own at least fifty percent
+    (50%) of voting power;
+(c) sale of substantially all assets),
+the non-changing party shall have the right to terminate this Agreement upon sixty (60) days
+written notice.
+
+Notwithstanding the foregoing, a Change of Control shall not include:
+(i) acquisitions of voting securities by any employee stock ownership plan or trust established
+    by the party;
+(ii) reorganizations among entities that are under common control before and after the transaction;
+(iii) the appointment of a new board of directors that owns less than twenty percent (20%) of
+      voting securities.
+
+Buyer must provide written notice of any Change of Control event within fifteen (15) business days
+of the occurrence.
+
+SECTION 9: WARRANTIES
+Each party warrants that it has the legal authority to enter into this Agreement and that its
+performance hereunder will not violate any third-party intellectual property rights or applicable law.
+
+SECTION 10: LIMITATION OF LIABILITY
+Neither party's aggregate liability under this Agreement shall be limited to the total fees paid
+by Client in the twelve (12) months immediately preceding the date of the claim, except for:
+(a) indemnification obligations under Section 11;
+(b) breach of confidentiality obligations under Section 4;
+(c) gross negligence or willful misconduct.
+
+SECTION 11: INDEMNIFICATION
+Each party shall indemnify, defend, and hold harmless the other party from and against any and all
+third-party claims, damages, and costs (including attorneys' fees) arising from or related to
+intellectual property infringement claims against the receiving party's use of the providing party's
+services or work product.
+
+SECTION 12: GOVERNING LAW
+This Agreement shall be governed by and construed in accordance with the laws of the State of
+Delaware, without regard to its conflicts of law principles. The parties irrevocably submit to the
+exclusive jurisdiction of the state and federal courts located in Delaware.
+
+SECTION 13: ENTIRE AGREEMENT
+This Agreement, together with all SOWs executed hereunder, constitutes the entire agreement between
+the parties with respect to the subject matter hereof and supersedes all prior negotiations,
+representations, and agreements, whether written or oral.
+
+IN WITNESS WHEREOF, the parties have executed this Agreement as of the Effective Date.
+
+ACME CORPORATION                        TARGET INDUSTRIES LLC
+
+By: _________________________           By: _________________________
+Name: John Smith                        Name: Jane Doe
+Title: Chief Executive Officer         Title: President
+Date: March 1, 2024                     Date: March 1, 2024

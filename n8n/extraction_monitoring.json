@@ -1,0 +1,62 @@
+{
+  "name": "Extraction Quality Monitoring",
+  "description": "Hourly monitoring: Query LangSmith for extraction traces → detect errors → aggregate metrics → alert on degradation",
+  "nodes": [
+    {
+      "parameters": {
+        "trigger": "every",
+        "unit": "hours",
+        "value": 1
+      },
+      "id": "1e2c3a4b-1234",
+      "name": "Cron: Hourly Extraction Audit",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.smith.langchain.com/runs/stream",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "{{ $json.langsmith_api_key }}"
+            }
+          ]
+        },
+        "qs": {
+          "filter": "tags:extraction AND created_at>{{ $now.subtract(1, 'hour').toISOString() }}",
+          "limit": "1000"
+        }
+      },
+      "id": "2f3d4e5b-5678",
+      "name": "Query LangSmith API for Recent Extractions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [450, 300],
+      "onError": "continueErrorHandling"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse extraction metrics from LangSmith traces\nconst runs = $json.data || [];\nconst metrics = {\n  total_extractions: runs.length,\n  successful_extractions: 0,\n  failed_extractions: 0,\n  avg_confidence: 0,\n  avg_f1_score: 0,\n  errors: [],\n  low_confidence_cases: []\n};\n\nlet total_confidence = 0;\nlet total_f1 = 0;\nlet f1_count = 0;\n\nruns.forEach(run => {\n  const output = run.outputs || {};\n  const outputs_metrics = output.metrics || {};\n  \n  // Check for errors\n  if (run.error) {\n    metrics.failed_extractions++;\n    metrics.errors.push({\n      run_id: run.id,\n      error: run.error,\n      timestamp: run.created_at\n    });\n  } else {\n    metrics.successful_extractions++;\n  }\n  \n  // Track confidence\n  if (outputs_metrics.avg_confidence) {\n    total_confidence += outputs_metrics.avg_confidence;\n    if (outputs_metrics.avg_confidence < 0.85) {\n      metrics.low_confidence_cases.push({\n        run_id: run.id,\n        confidence: outputs_metrics.avg_confidence\n      });\n    }\n  }\n  \n  // Track F1 score (from custom evaluators)\n  if (outputs_metrics.f1_score) {\n    total_f1 += outputs_metrics.f1_score;\n    f1_count++;\n  }\n});\n\n// Calculate averages\nmetrics.avg_confidence = total_confidence / runs.length || 0;\nmetrics.avg_f1_score = f1_count > 0 ? total_f1 / f1_count : 0;\nmetrics.error_rate = (metrics.failed_extractions / runs.length * 100) || 0;\nmetrics.low_confidence_rate = (metrics.low_confidence_cases.length / runs.length * 100) || 0;\n\nreturn { extraction_metrics: metrics };"
+      },
+      "id": "3e4f5g6c-9abc",
+      "name": "Aggregate Extraction Metrics",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "any": [\n            {\n              \"value1\": \"{{ $json.extraction_metrics.error_rate }}\",\n              \"value2\": 5,\n              \"operation\": \"gt\"\n            },\n            {\n              \"value1\": \"{{ $json.extraction_metrics.avg_f1_score }}\",\n              \"value2\": 0.94,\n              \"operation\": \"lt\"\n            }\n          ]\n        }\n      },\n      "id": "4f5g6h7d-def0",\n      "name": "Quality Degradation Detected?",
+n      "type": "n8n-nodes-base.if",\n      "typeVersion": 1,\n      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",\n        "url": "https://hooks.slack.com/services/{{ $json.slack_webhook_id }}\",\n        "body\": {\n          \"channel\": \"#extraction-monitoring\",\n          \"username\": \"Contract Intelligence Bot\",\n          \"text\": \"⚠️ Hourly Extraction Quality Report\",\n          \"blocks\": [\n            {\n              \"type\": \"header\",\n              \"text\": {\n                \"type\": \"plain_text\",\n                \"text\": \"⚠️ Hourly Extraction Metrics\"\n              }\n            },\n            {\n              \"type\": \"section\",\n              \"fields\": [\n                {\n                  \"type\": \"mrkdwn\",\n                  \"text\": \"*Total Extractions:*\\n{{ $json.extraction_metrics.total_extractions }}\"\n                },\n                {\n                  \"type\": \"mrkdwn\",\n                  \"text\": \"*Success Rate:*\\n{{ (100 - $json.extraction_metrics.error_rate).toFixed(1) }}%\"\n                },\n                {\n                  \"type\": \"mrkdwn\",\n                  \"text\": \"*Avg Confidence:*\\n{{ ($json.extraction_metrics.avg_confidence * 100).toFixed(1) }}%\"\n                },\n                {\n                  \"type\": \"mrkdwn\",\n                  \"text\": \"*Avg F1 Score:*\\n{{ ($json.extraction_metrics.avg_f1_score).toFixed(3) }}\"\n                }\n              ]\n            }\n          ]\n        }\n      },\n      "id\": \"5g6h7i8e-ghij\",\n      "name\": \"Post Slack Summary\",\n      "type\": \"n8n-nodes-base.slack\",\n      "typeVersion\": 2,\n      "position\": [1050, 200],\n      "onError\": \"continueErrorHandling\"\n    },\n    {\n      \"parameters\": {\n        \"apiKey\": \"{{ $json.resend_api_key }}\",\n        \"to\": \"engineering@contract-intelligence.app\",\n        \"from\": \"alerts@contract-intelligence.app\",\n        \"subject\": \"ALERT: Extraction Quality Degradation Detected\",\n        \"html\": \"<h2>⚠️ Extraction Quality Alert</h2><p><strong>Error Rate:</strong> {{ $json.extraction_metrics.error_rate.toFixed(1) }}% (threshold: 5%)</p><p><strong>Failed Extractions:</strong> {{ $json.extraction_metrics.failed_extractions }}</p><p><strong>Avg F1 Score:</strong> {{ $json.extraction_metrics.avg_f1_score.toFixed(3) }} (target: >= 0.94)</p><p><strong>Details:</strong> Review LangSmith dashboard for failing traces</p><p><a href='https://smith.langchain.com/projects/contract-intelligence-prod'>LangSmith Dashboard</a></p>\"\n      },\n      \"id\": \"6h7i8j9f-klmn\",\n      \"name\": \"Send Email Alert to Engineering\",\n      \"type\": \"n8n-nodes-base.resend\",\n      \"typeVersion\": 1,\n      \"position\": [1050, 400],\n      \"onError\": \"continueErrorHandling\"\n    },\n    {\n      \"parameters\": {\n        \"url\": \"https://api.contract-intelligence.app/v1/monitoring/extraction-metrics\",\n        \"method\": \"POST\",\n        \"authentication\": \"genericCredentialType\",\n        \"genericCredentialType\": \"httpHeaderAuth\",\n        \"body\": {\n          \"timestamp\": \"{{ $now }}\",\n          \"metrics\": \"{{ $json.extraction_metrics }}\",\n          \"alert_triggered\": true\n        }\n      },\n      \"id\": \"7i8j9k0g-opqr\",\n      \"name\": \"Log Metrics to Internal DB\",\n      \"type\": \"n8n-nodes-base.httpRequest\",\n      \"typeVersion\": 4,\n      \"position\": [1250, 300],\n      \"onError\": \"continueErrorHandling\"\n    },\n    {\n      \"parameters\": {\n        \"functionCode\": \"// Log successful audit completion\\nreturn {\\n  status: 'audit_complete',\\n  timestamp: new Date().toISOString(),\\n  alert_sent: $json.alert_triggered || false,\\n  extractions_monitored: $json.extraction_metrics.total_extractions\\n};\"\n      },\n      \"id\": \"8j9k0l1h-stuv\",\n      \"name\": \"Log Audit Completion\",\n      \"type\": \"n8n-nodes-base.function\",\n      \"typeVersion\": 1,\n      \"position\": [1400, 300]\n    }\n  ],\n  \"connections\": {\n    \"Cron: Hourly Extraction Audit\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Query LangSmith API for Recent Extractions\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Query LangSmith API for Recent Extractions\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Aggregate Extraction Metrics\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Aggregate Extraction Metrics\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Quality Degradation Detected?\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Quality Degradation Detected?\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Post Slack Summary\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ],\n        [\n          {\n            \"node\": \"Send Email Alert to Engineering\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Send Email Alert to Engineering\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Log Metrics to Internal DB\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Post Slack Summary\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Log Metrics to Internal DB\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Log Metrics to Internal DB\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Log Audit Completion\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"active\": true,\n  \"settings\": {\n    \"executionOrder\": \"v1\",\n    \"saveExecutionProgress\": true\n  },\n  \"tags\": [\n    \"monitoring\",\n    \"extraction\",\n    \"quality-assurance\"\n  ]\n}\n

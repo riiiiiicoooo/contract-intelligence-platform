@@ -1,0 +1,324 @@
+{
+  "name": "Deal Room Document Ingestion",
+  "description": "Webhook-triggered workflow: Document upload → classify type → extract if contract → notify analyst",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contract-upload",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "httpHeaderAuth"
+      },
+      "id": "0c0d23d3-1234",
+      "name": "Webhook: Document Uploaded",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "{{ env.WEBHOOK_ID_INGESTION }}"
+    },
+    {
+      "parameters": {
+        "operation": "extractMetadata",
+        "filePath": "{{ $json.file_path }}",
+        "outputFormat": "json"
+      },
+      "id": "8f1e9c7a-5678",
+      "name": "Extract File Metadata",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "onError": "continueErrorHandling"
+    },
+    {
+      "parameters": {
+        "url": "https://api.contract-intelligence.app/v1/classify",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $json.api_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "body": {
+          "mimetype": "{{ $json.mimetype }}",
+          "page_count": "{{ $json.page_count }}",
+          "file_size": "{{ $json.file_size }}"
+        }
+      },
+      "id": "6e2f8a1b-9abc",
+      "name": "Classify Document Type",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [650, 300],
+      "onError": "continueErrorHandling"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "any": [
+            {
+              "value1": "{{ $json.classification.document_type }}",
+              "value2": "contract",
+              "operation": "equals"
+            }
+          ]
+        }
+      },
+      "id": "4a3c5d6e-def0",
+      "name": "Is Document a Contract?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.trigger.dev/v1/runs",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $json.trigger_api_key }}"
+            }
+          ]
+        },
+        "body": {
+          "eventKey": "contract.extraction.requested",
+          "payload": {
+            "contract_id": "{{ $json.contract_id }}",
+            "file_path": "{{ $json.file_path }}",
+            "contract_type": "{{ $json.classification.contract_type }}",
+            "deal_id": "{{ $json.deal_id }}",
+            "tenant_id": "{{ $json.tenant_id }}"
+          }
+        }
+      },
+      "id": "2c1e9a3b-ghij",
+      "name": "Trigger Contract Extraction Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1050, 200],
+      "onError": "continueErrorHandling"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "any": [
+            {
+              "value1": "{{ $json.classification.document_type }}",
+              "value2": "amendment",
+              "operation": "equals"
+            }
+          ]
+        }
+      },
+      "id": "7f4c2d1a-klmn",
+      "name": "Is Amendment to Existing Contract?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://api.contract-intelligence.app/v1/contracts/{{ $json.parent_contract_id }}/link-amendment",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "httpHeaderAuth",
+        "body": {
+          "amendment_contract_id": "{{ $json.contract_id }}",
+          "file_path": "{{ $json.file_path }}"
+        }
+      },
+      "id": "3e5a1c9d-opqr",
+      "name": "Link Amendment to Parent Contract",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1250, 400],
+      "onError": "continueErrorHandling"
+    },
+    {
+      "parameters": {
+        "apiKey": "{{ $json.resend_api_key }}",
+        "to": "{{ $json.analyst_email }}",
+        "from": "noreply@contract-intelligence.app",
+        "subject": "New Document Uploaded: {{ $json.original_filename }}",
+        "html": "<p>A new document has been uploaded to deal <strong>{{ $json.deal_name }}</strong>:</p><p><strong>File:</strong> {{ $json.original_filename }}</p><p><strong>Type:</strong> {{ $json.classification.document_type }}</p><p><strong>Status:</strong> {{ $json.classification.confidence }}% confidence</p><p><a href='https://app.contract-intelligence.app/deals/{{ $json.deal_id }}/documents'>Review in Dashboard</a></p>"
+      },
+      "id": "9c8b2f1e-stuv",
+      "name": "Notify Analyst - Document Uploaded",
+      "type": "n8n-nodes-base.resend",
+      "typeVersion": 1,
+      "position": [1250, 550],
+      "onError": "continueErrorHandling"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "https://api.contract-intelligence.app/v1/contracts/{{ $json.contract_id }}",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "httpHeaderAuth",
+        "body": {
+          "processing_status": "queued",
+          "processing_started_at": "{{ $now }}"
+        }
+      },
+      "id": "5d7e4c2a-wxyz",
+      "name": "Update Contract Status to Queued",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1050, 100]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Log successful ingestion\nreturn {\n  status: 'success',\n  contract_id: $json.contract_id,\n  document_type: $json.classification.document_type,\n  processing_initiated: true,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "1f2e3d4c-abcd",
+      "name": "Log Ingestion Success",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1400, 300]
+    }
+  ],
+  "connections": {
+    "Webhook: Document Uploaded": {
+      "main": [
+        [
+          {
+            "node": "Extract File Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract File Metadata": {
+      "main": [
+        [
+          {
+            "node": "Classify Document Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Document Type": {
+      "main": [
+        [
+          {
+            "node": "Is Document a Contract?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Document a Contract?": {
+      "main": [
+        [
+          {
+            "node": "Update Contract Status to Queued",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Amendment to Existing Contract?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Contract Status to Queued": {
+      "main": [
+        [
+          {
+            "node": "Trigger Contract Extraction Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Contract Extraction Job": {
+      "main": [
+        [
+          {
+            "node": "Log Ingestion Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Amendment to Existing Contract?": {
+      "main": [
+        [
+          {
+            "node": "Link Amendment to Parent Contract",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Analyst - Document Uploaded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Link Amendment to Parent Contract": {
+      "main": [
+        [
+          {
+            "node": "Notify Analyst - Document Uploaded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Analyst - Document Uploaded": {
+      "main": [
+        [
+          {
+            "node": "Log Ingestion Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "callerPolicy": "any",
+    "errorHandler": {
+      "node": "Log Ingestion Success",
+      "type": "main"
+    }
+  },
+  "tags": [
+    "ingestion",
+    "contracts",
+    "deal-room"
+  ]
+}

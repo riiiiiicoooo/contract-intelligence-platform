@@ -1,0 +1,125 @@
+VENDOR SERVICES AGREEMENT
+
+This Vendor Services Agreement ("Agreement") is entered into effective June 1, 2023 ("Effective Date"),
+between Acme Corporation, a Delaware corporation ("Client"), and CloudTech Solutions Inc., a California
+corporation ("Vendor").
+
+RECITALS
+
+WHEREAS, Vendor provides IT infrastructure services including cloud hosting, security monitoring, and
+technical support;
+
+WHEREAS, Client desires to procure such services under this Agreement;
+
+NOW, THEREFORE, in consideration of the mutual covenants and agreements herein:
+
+SECTION 1: SERVICES
+Vendor shall provide the following services:
+- Cloud hosting infrastructure (AWS, Azure, or equivalent)
+- 24/7 monitoring and alerting
+- Security patch management
+- Technical support (4-hour response time for critical issues, 24-hour for standard)
+- Monthly capacity planning and optimization reports
+
+TERM AND RENEWAL
+
+SECTION 2: TERM AND RENEWAL
+This Agreement shall commence on the Effective Date and shall have an initial term of three (3) years
+("Initial Term"). This Agreement shall automatically renew for successive one-year terms ("Renewal Terms")
+unless either party provides written notice of non-renewal at least one hundred twenty (120) days prior to
+the then-current expiration date. In the event either party fails to provide such notice, this Agreement
+shall automatically renew on the same terms for an additional one-year period.
+
+SECTION 3: TERMINATION FOR CAUSE
+Either party may terminate this Agreement for material breach upon thirty (30) days written notice to
+the other party, provided that the breaching party is given an opportunity to cure such material breach
+within the thirty (30) day notice period. If the breach is not cured within thirty (30) days, the Agreement
+shall terminate at the end of the notice period.
+
+SECTION 4: TERMINATION FOR CONVENIENCE
+Client may terminate this Agreement for convenience upon one hundred twenty (120) days written notice to
+Vendor. Upon such termination, Client shall pay all accrued fees through the termination date plus a
+termination fee equal to three (3) months of the then-current annual fees.
+
+SECTION 5: FEES AND PRICE ESCALATION
+5.1 Base Fees. The annual fees for services shall be as follows:
+- Year 1: $500,000
+- Year 2: $515,000
+- Year 3: $530,450
+
+5.2 Price Escalation. Commencing in the fourth year of this Agreement, Vendor fees shall automatically
+increase by three percent (3%) annually on each anniversary date of this Agreement. Client may object to
+such annual increases by providing written notice within thirty (30) days of the invoice for the new year.
+If Client objects, the parties shall negotiate in good faith regarding the increased fees.
+
+5.3 Invoice and Payment. Vendor shall invoice Client monthly in advance for the services. All invoices
+are due and payable within thirty (30) days of invoice date. Vendor may suspend services if payment is
+more than fifteen (15) days overdue.
+
+SECTION 6: CHANGE OF CONTROL
+6.1 Notice Requirement. If Client undergoes a Change of Control (as defined below), Client must notify
+Vendor in writing within thirty (30) days of such Change of Control event.
+
+6.2 Vendor Termination Right. Upon receipt of notice of Client's Change of Control, Vendor may terminate
+this Agreement upon thirty (30) days written notice. In the event Vendor exercises this termination right,
+the final invoice shall include termination fees equal to three (3) months of the then-current annual fees.
+
+6.3 Definition. "Change of Control" means: (a) any transaction in which a person or group acquires
+beneficial ownership of more than 50% of the voting securities of Client; (b) any merger or consolidation
+involving Client unless the entity continues to own at least 50% of the voting power; (c) any sale of
+substantially all assets of Client.
+
+SECTION 7: ASSIGNMENT
+Client may not assign this Agreement without Vendor's prior written consent, which may be withheld in
+Vendor's sole discretion. Notwithstanding the foregoing, Client may assign this Agreement to an acquirer
+in connection with a Change of Control, subject to Vendor's termination right under Section 6.2.
+
+SECTION 8: LIMITATIONS ON LIABILITY
+Neither party's aggregate liability arising under or related to this Agreement shall exceed the total
+fees paid by Client in the twelve (12) months preceding the claim. This limitation does not apply to:
+(a) indemnification obligations under Section 9;
+(b) breach of confidentiality obligations;
+(c) either party's gross negligence or willful misconduct.
+
+SECTION 9: INDEMNIFICATION
+Vendor shall indemnify Client from any third-party claims that the services or infrastructure provided
+by Vendor infringe any intellectual property rights, provided Client notifies Vendor of such claim in
+writing and grants Vendor sole control of the defense and settlement.
+
+SECTION 10: SERVICE LEVEL AGREEMENT
+10.1 Uptime Guarantee. Vendor shall maintain at least 99.5% system uptime, measured monthly. Uptime
+is defined as the percentage of time that Vendor's services are available and functioning as intended.
+
+10.2 Service Credits. If Vendor fails to meet the uptime guarantee:
+- 98.5% - 99.4% uptime: 5% monthly fee credit
+- 98.0% - 98.4% uptime: 10% monthly fee credit
+- Below 98.0% uptime: 25% monthly fee credit
+
+Service credits are Client's sole remedy for service failures.
+
+SECTION 11: CONFIDENTIALITY
+Each party agrees to maintain confidentiality of the other's proprietary information disclosed under this
+Agreement. Confidentiality obligations shall survive termination for three (3) years.
+
+SECTION 12: DATA PROTECTION
+Vendor shall comply with all applicable data protection laws, including GDPR, CCPA, and similar
+regulations. Vendor shall maintain reasonable security measures to protect Client's data and shall notify
+Client within 24 hours of any suspected data breach.
+
+SECTION 13: GOVERNING LAW
+This Agreement shall be governed by the laws of the State of California, without regard to conflicts of
+law principles. Any disputes shall be resolved through binding arbitration administered by JAMS in
+San Francisco, California.
+
+SECTION 14: ENTIRE AGREEMENT
+This Agreement constitutes the entire agreement between the parties with respect to the services
+provided hereunder and supersedes all prior negotiations, representations, and agreements.
+
+IN WITNESS WHEREOF, the parties execute this Agreement as of the Effective Date.
+
+ACME CORPORATION                        CLOUDTECH SOLUTIONS INC.
+
+By: _________________________           By: _________________________
+Name: Robert Johnson                    Name: Michael Chen
+Title: VP Operations                    Title: Chief Commercial Officer
+Date: June 1, 2023                      Date: June 1, 2023

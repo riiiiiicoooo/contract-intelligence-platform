@@ -1,0 +1,243 @@
+# Contract Intelligence Platform - Cursor Rules
+
+## Project Overview
+
+**Contract Intelligence Platform** is an AI-powered M&A due diligence contract analysis system built for PE-backed advisory firms. It ingests 200-500+ contracts per deal, extracts commercial terms, flags risks, and generates deal-ready deliverables (Excel matrices, PDF reports, PowerPoint summaries).
+
+**Core Problem Solved:** Reducing contract review timelines from 3-4 weeks to 2-3 days with 97% risk flag recall.
+
+## Tech Stack
+
+### AI/LLM
+- **Primary Model:** Claude API (3.5 Sonnet, Opus) - 200K context for full contracts
+- **Fallback Model:** GPT-4 Turbo
+- **Embeddings:** Voyage-law-2 (legal-domain optimized, 1024 dimensions)
+- **Orchestration:** LangGraph (stateful AI agent graphs with human-in-the-loop)
+- **Tracing & Evaluation:** LangSmith with custom evaluators (extraction F1, hallucination detection)
+
+### Data & Search
+- **Database:** Supabase PostgreSQL with pgvector extension
+- **Vector Indexes:** HNSW (m=16, ef_construction=128) for 50M+ scale
+- **Hybrid Search:** BM25 (full-text) + vector semantic + Cohere Reranking
+- **Schema:** 12 tables (tenants, users, deals, contracts, clauses, embeddings, risk_flags, playbooks, audit_log, etc.)
+- **RLS Policies:** Per-tenant isolation (each PE firm = one tenant)
+
+### Document Processing
+- **Native PDFs:** Docling (DocLayNet layout analysis, MIT license)
+- **Scanned/OCR:** Azure Document Intelligence (99.8% accuracy)
+- **Word Files:** python-docx
+- **Chunking:** Clause-level hierarchical (200-500 tokens)
+- **PII Redaction:** Microsoft Presidio (pre-processing, attorney-client privilege protection)
+
+### Workflow & Automation
+- **Async Jobs:** Trigger.dev (contract extraction, batch deal analysis)
+- **Low-Code Workflows:** n8n (document ingestion, monitoring, Slack/email notifications)
+- **Email Templates:** React Email
+- **Email Delivery:** Resend (transactional emails)
+
+### Auth & Frontend
+- **Auth:** Clerk (SSO, SAML, passwordless, role-based access)
+- **Frontend:** Next.js + shadcn/ui (dashboard, contract viewer, search interface)
+- **PDF Viewer:** react-pdf-highlighter (inline clause highlighting, annotations)
+- **Rich Text:** Tiptap (reviewer comments)
+
+### Monitoring & Compliance
+- **Deployment:** Vercel (Next.js frontend)
+- **Error Tracking:** Sentry or equivalent
+- **Audit Logging:** PostgreSQL audit_log table (immutable, compliance-ready)
+- **Compliance:** SOC 2 Type II architecture (privacy, data residency, zero data retention)
+
+## Architecture
+
+### Multi-Tenant Data Model
+```
+Tenants (PE firms)
+  ├── Users (partner, associate, analyst roles)
+  ├── Deals (with deal_type, playbook_id)
+  │   └── Contracts (with processing_status, parent_contract_id for amendments)
+  │       ├── Clauses (40+ types with risk_level, confidence)
+  │       ├── Clause Embeddings (vector(1024))
+  │       ├── Contract Parties (normalized names for cross-deal matching)
+  │       └── Risk Flags (flagged issues with severity and resolution)
+  ├── Playbooks (deal-type-specific rule sets)
+  └── Clause Library (market standards with centroid embeddings)
+```
+
+### AI Pipeline
+1. **Classification:** Detect document type (contract, amendment, schedule, exhibit)
+2. **Extraction:** Identify 40+ clause types (change of control, termination, indemnification, IP, etc.)
+3. **Risk Scoring:** Flag non-standard terms, missing clauses, conflicting provisions
+4. **Embedding:** Generate voyage-law-2 vectors for semantic search
+5. **Cross-Reference:** Detect conflicts across full contract portfolio
+6. **Human Review:** LangGraph routes low-confidence extractions (confidence < 0.85) to analysts
+
+### Automation Workflows (n8n)
+- **deal_room_ingestion.json:** Webhook → classify → extract → notify
+- **extraction_monitoring.json:** Hourly audit of extraction quality via LangSmith
+
+### Long-Running Jobs (Trigger.dev)
+- **contract_extraction.ts:** Full pipeline per document (2-10 min) with checkpointing
+- **deal_analysis.ts:** Batch processing with fan-out/fan-in for portfolio analysis
+
+## Key Design Decisions
+
+### Hybrid Search Strategy
+- **Why:** Different user queries benefit from different approaches
+  - Keyword queries ("unlimited liability") → BM25 full-text
+  - Semantic queries ("what are the termination rights?") → vector search
+  - Complex queries → Cohere Reranking combines both signals
+- **Implementation:** Clause-level embeddings stored in pgvector, HNSW indexes
+
+### Clause-Level Chunking
+- **Why:** Legal documents have natural boundaries; preserves legal context and enables precise attribution
+- **How:** 200-500 token chunks at clause boundaries with hierarchical metadata (section → subsection → clause)
+
+### PII Redaction (Pre-Processing)
+- **Why:** *United States v. Heppner* (2026) - AI-processed documents without PII redaction risk privilege waiver
+- **How:** Presidio detects PII (confidence > 0.7) → anonymize before LLM processing → mapping table in encrypted storage for re-linking
+
+### Multi-Model Routing
+- **Why:** Different clause types benefit from different model strengths; fallback prevents single point of failure
+- **How:** Classification → route to best-fit model (Claude for complex multi-section analysis, GPT-4 for standard extractions)
+
+### Privilege Protection via Human-in-the-Loop
+- **Why:** Attorney-client privilege requires human oversight
+- **How:** Confidence < 0.85 routes to analyst review in LangGraph conditional edges; maintains audit trail
+
+### pgvector over Dedicated Vector DB
+- **Why:** Unified PostgreSQL stack (vectors + metadata + auth + RLS in one database); eliminates data sync complexity
+- **How:** Supabase-hosted PostgreSQL with pgvector extension; RLS policies enforce tenant isolation
+
+## Coding Conventions
+
+### Python Code Style
+- **Format:** Black (88-char line length)
+- **Linting:** Flake8 + isort
+- **Type hints:** Required for all functions and class methods
+- **Docstrings:** Google-style for all public functions
+
+### Project Structure
+```
+src/
+  ├── orchestration/
+  │   └── analysis_workflow.py (LangGraph graphs)
+  ├── prompts/
+  │   ├── clause_extraction.py (extraction prompts per clause type)
+  │   ├── risk_scoring.py (risk assessment logic)
+  │   └── cross_reference.py (conflict detection)
+  ├── pipeline/
+  │   ├── document_processor.py (Docling + Azure OCR)
+  │   ├── clause_extractor.py (LLM extraction)
+  │   ├── risk_scorer.py (confidence + risk mapping)
+  │   └── embedder.py (voyage-law-2 generation)
+  └── api/
+      ├── auth.py (Clerk integration)
+      ├── routes/
+      │   ├── documents.py (upload, retrieve, delete)
+      │   ├── search.py (hybrid semantic/keyword)
+      │   ├── analysis.py (trigger extraction, export)
+      │   └── review.py (human review endpoints)
+      └── models.py (Pydantic schemas)
+```
+
+### LangSmith Integration
+- **Decorator:** @traceable on all pipeline steps
+- **Projects:** Named per environment (prod, staging, dev)
+- **Datasets:** evaluation_extraction (F1 benchmarks), evaluation_risks (hallucination detection)
+- **Custom Evaluators:** extract_accuracy, risk_flag_precision, conflict_detection_recall
+- **Cost Tracking:** Per-extraction token counts and latency logged
+
+### n8n Workflows
+- **Naming:** snake_case JSON filenames matching function (deal_room_ingestion.json)
+- **Error Handling:** Retry nodes with exponential backoff
+- **Notifications:** Async via Resend (email) and Slack webhooks
+
+### Trigger.dev Jobs
+- **Naming:** PascalCase TypeScript files (ContractExtraction.ts)
+- **Checkpointing:** Between each pipeline stage (classify → extract → score → cross-ref)
+- **Error Handling:** Retry logic with dead-letter queue to audit_log
+
+### React Email Templates
+- **Location:** emails/*.tsx
+- **Components:** Use @react-email/components only (no external CSS frameworks)
+- **Props:** Typed with React.FC<EmailProps> interface
+- **Testing:** render() + renderAsync() for preview
+
+### Clerk Middleware
+- **Location:** middleware.ts in Next.js root
+- **Role Mapping:** Partner (full), Associate (review), Analyst (read-only)
+- **Tenant Isolation:** Extract org_id from Clerk, set app.current_tenant for RLS
+
+### Database Queries
+- **ORM:** Supabase JS client for frontend, SQLAlchemy for Python backend
+- **RLS:** Always include tenant_id in WHERE clause for enforcement
+- **Migrations:** Use Supabase migration format (001_initial_schema.sql, etc.)
+- **Indexes:** Composite indexes for (tenant_id, status) queries
+
+### Secrets Management
+- **Environment Variables:** .env.local (frontend), .env (backend)
+- **Sensitive Keys:** Clerk publishable/secret, Supabase URL/key, LangSmith API key
+- **Never Commit:** Use .env.example as template
+
+## Critical Compliance Notes
+
+### Attorney-Client Privilege
+- PII must be redacted before LLM processing (Presidio)
+- Human review required for confidence < 0.85 (LangGraph routing)
+- Audit log is immutable and compliance-ready for discovery
+
+### Tenant Isolation
+- RLS policies enforce at database level (not application level)
+- All queries must include tenant_id filtering
+- Audit log records all cross-tenant queries (rare but detectable)
+
+### Zero Data Retention
+- All Claude/GPT-4 calls under ZDR (Zero Data Retention) agreements
+- LLM responses not cached; re-run extraction for reproducibility
+- LangSmith tracing is local/internal only (no external LLM evaluation)
+
+### Export Compliance
+- Generated reports contain no PII (use anonymized clause text)
+- Excel matrices redact party names if sensitivity flag is set
+- PDF/PPT exports include watermark "CONFIDENTIAL - ATTORNEY WORK PRODUCT"
+
+## Testing Strategy
+
+### Unit Tests
+- **Framework:** pytest
+- **Mocks:** Mock LLM responses with pre-defined extractions
+- **Coverage:** >80% for data layer, 60%+ for business logic
+
+### Integration Tests
+- **Database:** Use test Supabase instance
+- **Fixtures:** Sample contracts in demo/sample_contracts/
+- **Workflows:** Test LangGraph graphs with synthetic data
+
+### Evaluation
+- **LangSmith Datasets:** Run eval_extraction, eval_risks before production deploys
+- **Metrics:** F1 >= 0.94 for extraction, recall >= 0.97 for risk flags
+
+## Performance Targets
+
+- **Clause Extraction:** < 10 minutes per 100-page contract
+- **Cross-Reference Analysis:** < 5 minutes per 500-contract deal
+- **Search:** < 500ms for hybrid queries on 50M+ vectors
+- **Export Generation:** < 30 seconds for Excel matrix (500+ contracts)
+
+## Deployment
+
+- **Frontend:** Vercel (auto-deploys on main branch)
+- **Backend:** Docker on AWS ECS (or equivalent) with auto-scaling
+- **Database:** Supabase managed PostgreSQL
+- **Orchestration:** Temporal for durable pipelines; Trigger.dev for background jobs
+
+## Security Checklist
+
+- [ ] Clerk SSO configured for tenant
+- [ ] Supabase RLS policies enabled for all tenant tables
+- [ ] PII redaction enabled in document processor
+- [ ] LLM calls use ZDR agreements (no data retention)
+- [ ] Audit log immutable and encrypted at rest
+- [ ] CORS configured for frontend domain only
+- [ ] API rate limiting enabled (100 req/min per user)
+- [ ] Environment variables never logged
