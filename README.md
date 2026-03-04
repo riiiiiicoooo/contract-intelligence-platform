@@ -172,6 +172,22 @@ A platform that combines multi-model AI orchestration with structured legal docu
 
 ---
 
+## Business Context
+
+Approximately 2,400 mid-market M&A advisory firms in the US conduct 15-40 transactions annually, with combined contract review labor spending at $3.6B. This represents a massive operational drag on deal economics—contract review is a value-destroying activity (purely defensive) that delays deal closure.
+
+| Metric | Before Platform | After Platform | Per-Deal Savings |
+|--------|-----------------|-----------------|-----------------|
+| Review Cost Per Deal | $225,000 | $22,500 | $202,500 |
+| Review Time Per Deal | 3-4 weeks | 2-3 days | - |
+| **Annual Savings** (25 deals) | - | - | **$5,062,500** |
+| **Platform Cost** | - | $285,000 build + $1,800/mo | **Payback: < 1 deal** |
+| **3-Year ROI** | - | - | **52x** |
+
+If productized at $2,500-5,000/month per firm with per-deal overage, targeting $8-15M ARR at 200 customers.
+
+---
+
 ## Architecture
 
 ```
@@ -373,6 +389,16 @@ This platform was designed with legal industry compliance requirements at the ce
 
 ---
 
+## PM Perspective
+
+**Hardest decision: Multi-model routing vs. single Claude API.** The founding partner wanted to stick with Claude for everything—simpler, faster, and lower token costs. I fought for multi-model after running evaluation benchmarks showing GPT-4 outperformed Claude on nuanced clauses like indemnification and limitation of liability (where what's *not* said matters as much as what is). Compromise: Claude as primary with GPT-4 fallback for 6 clause types. This added 2 weeks to Phase 2 but improved our F1 score from 0.89 to 0.94, which was the difference between "helpful assistant" and "production-grade due diligence tool."
+
+**Surprise: Associates saw the tool as a threat, not a time-saver.** Discovery showed three-week review timelines, so I assumed value prop was obvious. But in rollout, associates resisted adoption. The real issue: associates measured success by billable hours, and automated review looked like it was eliminating their work. Breakthrough came from reframing the narrative—we positioned it as "contract review *prep*" not "automated review." The AI does the drudge work (first-pass extraction, basic risk flagging), associates still review every flag, sign off on findings, and own the analysis. This reframe reduced threat perception and showed how it multiplied associate efficiency instead of replacing them. Adoption jumped from 30% to 85% in two weeks.
+
+**Would do differently: Prioritize export engine earlier.** We treated Excel/PPT/PDF generation as Phase 3, nice-to-have polish. Partners wanted deal-ready deliverables on day one—Excel matrices they could present to investors, PDF risk reports to share with counsel. We fast-tracked exports and cut cross-document pattern analysis from MVP. Right call, but should have seen it from partner interviews. Lesson: don't assume internal tool engineering priorities match what clients actually use first.
+
+---
+
 ## About This Project
 
 This repository documents a product I built as **Principal Product Manager** for a PE-backed advisory firm. I owned the full product lifecycle - from initial client discovery through architecture decisions, sprint planning, and production deployment.
@@ -385,6 +411,6 @@ This repository documents a product I built as **Principal Product Manager** for
 - Establishing success metrics and building analytics dashboards
 - Managing stakeholder communication and phased rollout
 
-**Note:** Client-identifying details have been anonymized. Metrics and architecture reflect the actual production system.
+**Note:** Client-identifying details have been anonymized. Code represents the architecture and design decisions I drove; production deployments were managed by client engineering teams.
 
 
