@@ -343,6 +343,36 @@ This platform was designed with legal industry compliance requirements at the ce
 - **Audit Trail** - Every document view, AI interaction, modification, and export is logged with timestamps, user identity, and before/after states
 - **SOC 2 Type II** - Architecture designed for SOC 2 compliance from day one (Vanta/Drata automated monitoring)
 
+## Engagement & Budget
+
+### Team & Timeline
+
+| Role | Allocation | Duration |
+|------|-----------|----------|
+| Lead PM (Jacob) | 25 hrs/week | 18 weeks |
+| Lead Developer (US) | 40 hrs/week | 18 weeks |
+| Offshore Developer(s) | 2 × 35 hrs/week | 18 weeks |
+| QA Engineer | 25 hrs/week | 18 weeks |
+
+**Timeline:** 18 weeks total across 3 phases
+- **Phase 1: Discovery & Design** (3 weeks) — Due diligence workflow mapping, clause taxonomy design, compliance requirements (privilege, PII), model evaluation
+- **Phase 2: Core Build** (10 weeks) — Ingestion pipeline (Docling + Azure OCR), clause extraction, risk scoring, vector search, cross-document analysis
+- **Phase 3: Integration & Launch** (5 weeks) — Export engine (Excel/PPT/PDF), LangSmith evaluation suite, Clerk auth integration, partner/associate pilot, production hardening
+
+### Budget Summary
+
+| Category | Cost | Notes |
+|----------|------|-------|
+| PM & Strategy | $83,250 | Discovery, specs, stakeholder management |
+| Development (Lead + Offshore) | $181,800 | Core platform build |
+| QA | $15,750 | Quality assurance and testing |
+| AI/LLM Token Budget | $1,100/month | Claude Sonnet for clause extraction ~$450, GPT-4 fallback ~$200, Voyage law-2 embeddings ~$80, Cohere Rerank ~$150, LangSmith ~$50, batch processing discount applied |
+| Infrastructure | $520/month | Supabase Pro $25 + Vercel Pro $20 + Trigger.dev $25 + n8n $50 + AWS S3/compute $250 + Grafana $25 + Resend $20 + misc $105 |
+| **Total Engagement** | **$285,000** | Fixed-price, phases billed at milestones |
+| **Ongoing Run Rate** | **$1,800/month** | Infrastructure + AI tokens + support |
+
+---
+
 ## About This Project
 
 This repository documents a product I built as **Principal Product Manager** for a PE-backed advisory firm. I owned the full product lifecycle - from initial client discovery through architecture decisions, sprint planning, and production deployment.
