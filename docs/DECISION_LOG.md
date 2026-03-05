@@ -402,3 +402,26 @@ We tested on a validation set of 500 human-reviewed clauses across 50 contracts:
 - ~2.4% of auto-accepted clauses will have errors that slip through. Mitigated by partner spot-check process.
 - Associates should still review the auto-accepted list periodically (random sampling)
 - Need to re-evaluate threshold when extraction model is updated (confidence distributions may shift)
+
+---
+
+## DEC-013: Multi-Model Routing Over Single-Model Architecture
+
+**Date:** September 2024
+**Status:** Accepted (supersedes earlier approach)
+**Decider:** Jacob George (PM), Engineering Lead
+
+**Context:**
+V1 used GPT-4 exclusively for all clause extraction and risk scoring. Chose GPT-4 for its strong legal reasoning and context window.
+
+**What Happened:**
+Accuracy degraded significantly on non-standard clause structures — earn-out provisions with conditional triggers, multi-party indemnification chains, and nested change-of-control definitions. GPT-4 achieved 89% F1 on standard clauses but dropped to 71% on complex structures. Associates flagged 15-20 false negatives per deal on critical risk provisions. Partner feedback: "If I can't trust the red flags, I have to re-read everything anyway."
+
+**Decision:**
+Implemented model routing based on clause complexity. Standard clauses (non-compete, assignment, termination) → GPT-4. Complex multi-party clauses and financial provisions → Claude (stronger at structured reasoning). Fallback to dual-model consensus for high-risk flags.
+
+**Rationale:**
+Claude's structured output and reasoning chains performed better on nested conditional logic (82% → 94% F1 on complex clauses). Routing adds ~200ms per clause but reduces associate review time by 40%.
+
+**Consequences:**
+- Increased API costs by ~35%. Required building a clause complexity classifier (2 weeks). Need to maintain prompt templates for both models. But partner trust increased — "Now when I see a red flag, I actually believe it."
