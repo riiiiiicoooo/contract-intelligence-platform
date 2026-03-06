@@ -510,18 +510,43 @@ ALTER TABLE export_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE playbooks ENABLE ROW LEVEL SECURITY;
 
--- Tenant isolation policies (example - would be set per tenant in app)
--- These would be activated after authentication middleware sets session variables
+-- Tenant isolation policies using Supabase auth.jwt() for tenant verification
 
-/*
 CREATE POLICY tenant_isolation ON deals
   FOR ALL
-  USING (tenant_id = current_setting('app.current_tenant')::UUID);
+  USING (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID);
 
 CREATE POLICY tenant_isolation ON contracts
   FOR ALL
-  USING (tenant_id = current_setting('app.current_tenant')::UUID);
-*/
+  USING (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID);
+
+CREATE POLICY tenant_isolation ON contract_parties
+  FOR ALL
+  USING (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID);
+
+CREATE POLICY tenant_isolation ON clauses
+  FOR ALL
+  USING (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID);
+
+CREATE POLICY tenant_isolation ON clause_embeddings
+  FOR ALL
+  USING (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID);
+
+CREATE POLICY tenant_isolation ON risk_flags
+  FOR ALL
+  USING (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID);
+
+CREATE POLICY tenant_isolation ON export_jobs
+  FOR ALL
+  USING (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID);
+
+CREATE POLICY tenant_isolation ON audit_log
+  FOR ALL
+  USING (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID);
+
+CREATE POLICY tenant_isolation ON playbooks
+  FOR ALL
+  USING (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID);
 
 
 -- ============================================================================

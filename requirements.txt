@@ -1,5 +1,5 @@
 # Contract Intelligence Platform - Python Dependencies
-# Last Updated: January 2025
+# Last Updated: March 2026
 
 # ============================================================================
 # CORE DEPENDENCIES
@@ -23,15 +23,15 @@ pillow==10.0.0                 # Image processing
 # Vector Database
 psycopg2-binary==2.9.9         # PostgreSQL adapter
 pgvector==0.2.4                # pgvector Python interface
-sqlalchemy==2.0.23             # ORM for database operations
-alembic==1.13.0                # Database migrations
+sqlalchemy==2.0.36             # ORM for database operations
+alembic==1.14.0                # Database migrations
 
 # API & Server
-fastapi==0.104.0               # REST API framework
-pydantic==2.5.0                # Data validation with Python types
-pydantic-settings==2.1.0       # Environment-based settings
-uvicorn==0.24.0                # ASGI server
-starlette==0.27.0              # Web framework
+fastapi==0.115.0               # REST API framework
+pydantic==2.10.0               # Data validation with Python types
+pydantic-settings==2.6.0       # Environment-based settings
+uvicorn==0.30.0                # ASGI server
+starlette==0.40.0              # Web framework
 
 # Authentication & Security
 supabase==2.0.0                # Supabase Python client
@@ -50,11 +50,15 @@ jinja2==3.1.2                  # Template engine for reports
 
 # Async & Parallelization
 celery==5.3.4                  # Distributed task queue for exports
-redis==5.0.0                   # Cache & message broker
+redis==5.2.0                   # Cache & message broker
 python-dateutil==2.8.2         # Date/time utilities
 
 # Search & Retrieval
 cohere==4.34.0                 # Cohere Rerank API for search results
+
+# Resilience
+tenacity==8.2.3                # Retry with exponential backoff
+pybreaker==1.2.0               # Circuit breaker pattern
 
 # Monitoring & Logging
 python-json-logger==2.0.7      # JSON structured logging
@@ -65,18 +69,15 @@ sentry-sdk==1.38.0             # Error tracking
 # ============================================================================
 
 # Testing
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-cov==4.1.0
+pytest==8.3.0
+pytest-asyncio==0.24.0
+pytest-cov==5.0.0
 factory-boy==3.3.0             # Test data generation
 faker==21.0.0                  # Fake data generation
 
 # Linting & Formatting
-black==23.12.0                 # Code formatter
-flake8==6.1.0                  # Linter
-mypy==1.7.1                    # Type checker
-isort==5.13.2                  # Import sorter
-pylint==3.0.3                  # Code analysis
+ruff==0.8.0                    # All-in-one linter & formatter (replaces black, isort, flake8)
+mypy==1.13.0                   # Type checker
 
 # Documentation
 sphinx==7.2.6                  # Documentation generator

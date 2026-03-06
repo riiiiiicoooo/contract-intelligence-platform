@@ -16,6 +16,65 @@ Output includes:
 """
 
 from typing import TypedDict, Optional
+import re
+
+
+# Sanitize contract text to mitigate prompt injection — in production, use
+# dedicated guardrail libraries (e.g., NeMo Guardrails, Guardrails AI)
+def sanitize_prompt_input(text: str) -> str:
+    """Strip or escape common prompt injection patterns from user-controlled text.
+
+    This is a basic defense-in-depth measure. It catches obvious injection
+    attempts such as:
+    - Instructions to ignore/override the system prompt
+    - System prompt delimiter sequences (```, <|, [INST], etc.)
+    - XML-like tags that could confuse instruction boundaries
+    - Role-play or persona-switching attempts
+
+    In production, pair this with a dedicated guardrail service that runs
+    classifier-based injection detection (e.g., Lakera Guard, Rebuff, or
+    NVIDIA NeMo Guardrails).
+    """
+    if not text:
+        return text
+
+    # Patterns that attempt to override system instructions
+    injection_patterns = [
+        r"(?i)ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions|prompts|directives|rules)",
+        r"(?i)disregard\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions|prompts|directives|rules)",
+        r"(?i)forget\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions|prompts|directives|rules)",
+        r"(?i)override\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions|prompts|directives|rules)",
+        r"(?i)you\s+are\s+now\s+(a|an|the)\s+",
+        r"(?i)new\s+instructions?\s*:",
+        r"(?i)system\s*prompt\s*:",
+        r"(?i)act\s+as\s+(a|an|the)\s+",
+    ]
+
+    sanitized = text
+    for pattern in injection_patterns:
+        sanitized = re.sub(pattern, "[REDACTED_INJECTION_ATTEMPT]", sanitized)
+
+    # Strip system prompt delimiters that could break prompt boundaries
+    delimiter_sequences = [
+        "```",           # Markdown code fences
+        "<|system|>",    # ChatML-style delimiters
+        "<|user|>",
+        "<|assistant|>",
+        "<|im_start|>",
+        "<|im_end|>",
+        "[INST]",        # Llama-style delimiters
+        "[/INST]",
+        "<<SYS>>",
+        "<</SYS>>",
+    ]
+    for delimiter in delimiter_sequences:
+        sanitized = sanitized.replace(delimiter, "")
+
+    # Escape XML-like tags that could confuse instruction boundaries
+    sanitized = re.sub(r"<(/?)(?:system|instruction|prompt|role|context|admin)(\s[^>]*)?>",
+                       r"[\1\2]", sanitized, flags=re.IGNORECASE)
+
+    return sanitized
 
 
 class CrossReferenceConflict(TypedDict):
@@ -349,17 +408,21 @@ def get_cross_reference_prompt(
     Returns:
         Formatted prompt string ready for LLM API call
     """
+    # Sanitize user-controlled clause text before injection into prompt
+    sanitized_clauses_1 = sanitize_prompt_input(contract_1_clauses)
+    sanitized_clauses_2 = sanitize_prompt_input(contract_2_clauses)
+
     return COMPARISON_PROMPT.format(
         contract_1_name=contract_1_name,
         contract_1_id=contract_1_id,
         contract_1_type=contract_1_type,
         contract_1_pages=contract_1_pages,
-        contract_1_clauses=contract_1_clauses,
+        contract_1_clauses=sanitized_clauses_1,
         contract_2_name=contract_2_name,
         contract_2_id=contract_2_id,
         contract_2_type=contract_2_type,
         contract_2_pages=contract_2_pages,
-        contract_2_clauses=contract_2_clauses,
+        contract_2_clauses=sanitized_clauses_2,
         deal_type=deal_type,
         target_company=target_company,
         counterparty_name=counterparty_name,
