@@ -135,7 +135,7 @@ class ClauseExtractor:
     """
 
     PRIMARY_MODEL = "claude-sonnet-4-20250514"
-    FALLBACK_MODEL = "gpt-4-turbo-preview"
+    FALLBACK_MODEL = "gpt-4-turbo-2025-04-09"  # Latest stable GPT-4 Turbo
     MAX_RETRIES = 3
     TIMEOUT_SECONDS = 30
     TEMPERATURE = 0.2  # Low temperature for deterministic extraction

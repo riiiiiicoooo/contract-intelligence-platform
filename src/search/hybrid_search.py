@@ -85,21 +85,77 @@ class HybridSearch:
         PostgreSQL full-text search using GIN index on clause text.
         Catches exact legal terms like "force majeure", "indemnification",
         "Section 14.2".
-        """
-        # In production:
-        # SELECT
-        #     c.id, c.extracted_text, c.contract_id, c.clause_type,
-        #     c.page_number, c.risk_level,
-        #     ts_rank(to_tsvector('english', c.extracted_text),
-        #             plainto_tsquery($1)) AS score
-        # FROM clauses c
-        # JOIN contracts con ON con.id = c.contract_id
-        # WHERE con.deal_id = $2
-        #   AND to_tsvector('english', c.extracted_text) @@ plainto_tsquery($1)
-        # ORDER BY score DESC
-        # LIMIT 50
 
-        return []
+        Uses ts_rank with tsvector/tsquery for FTS on clause text.
+        """
+        if not self.db:
+            return []
+
+        try:
+            # Build dynamic WHERE clause for filters
+            where_clauses = ["con.deal_id = %s"]
+            params = [deal_id]
+
+            if filters:
+                if filters.get("clause_type"):
+                    where_clauses.append("c.clause_type = %s")
+                    params.append(filters["clause_type"])
+                if filters.get("risk_level"):
+                    where_clauses.append("c.risk_level = %s")
+                    params.append(filters["risk_level"])
+                if filters.get("contract_type"):
+                    where_clauses.append("con.contract_type = %s")
+                    params.append(filters["contract_type"])
+
+            where_sql = " AND ".join(where_clauses)
+
+            sql = f"""
+            SELECT
+                c.id, c.extracted_text, c.contract_id, c.clause_type,
+                c.page_number, c.risk_level, c.section_reference,
+                con.filename as contract_filename,
+                ts_rank(to_tsvector('english', c.extracted_text),
+                        plainto_tsquery('english', %s)) AS score
+            FROM clauses c
+            JOIN contracts con ON con.id = c.contract_id
+            WHERE {where_sql}
+              AND to_tsvector('english', c.extracted_text) @@ plainto_tsquery('english', %s)
+            ORDER BY score DESC
+            LIMIT %s
+            """
+
+            # Add query parameter (appears twice - once for rank, once for filter)
+            params.insert(0, query)
+            params.append(query)
+            params.append(self.BM25_LIMIT)
+
+            cursor = self.db.cursor()
+            cursor.execute(sql, params)
+            results = cursor.fetchall()
+
+            # Convert to list of dicts
+            bm25_results = [
+                {
+                    "id": r[0],
+                    "extracted_text": r[1],
+                    "contract_id": r[2],
+                    "clause_type": r[3],
+                    "page_number": r[4],
+                    "risk_level": r[5],
+                    "section_reference": r[6],
+                    "contract_filename": r[7],
+                    "score": r[8] or 0.0,
+                }
+                for r in results
+            ]
+
+            return bm25_results
+
+        except Exception as e:
+            # Log error but don't fail the entire search
+            import logging
+            logging.error(f"BM25 search error: {e}")
+            return []
 
     def _vector_search(
         self, query_embedding: list[float], deal_id: str, filters: Optional[dict] = None
@@ -109,36 +165,107 @@ class HybridSearch:
         Catches semantic equivalents: "termination for cause" matches
         "right to end agreement for material breach".
 
-        Uses cosine distance with HNSW index (m=16, ef_construction=128).
+        Uses cosine distance (<=>) with HNSW index (m=16, ef_construction=128).
+        Returns results ordered by vector distance, converted to similarity score.
         """
-        # In production:
-        # SELECT
-        #     c.id, c.extracted_text, c.contract_id, c.clause_type,
-        #     c.page_number, c.risk_level,
-        #     1 - (ce.embedding <=> $1::vector) AS score
-        # FROM clause_embeddings ce
-        # JOIN clauses c ON c.id = ce.clause_id
-        # JOIN contracts con ON con.id = c.contract_id
-        # WHERE con.deal_id = $2
-        # ORDER BY ce.embedding <=> $1::vector
-        # LIMIT 50
+        if not self.db or not query_embedding:
+            return []
 
-        return []
+        try:
+            # Convert embedding to PostgreSQL vector format
+            embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+
+            # Build dynamic WHERE clause for filters
+            where_clauses = ["con.deal_id = %s"]
+            params = [deal_id]
+
+            if filters:
+                if filters.get("clause_type"):
+                    where_clauses.append("c.clause_type = %s")
+                    params.append(filters["clause_type"])
+                if filters.get("risk_level"):
+                    where_clauses.append("c.risk_level = %s")
+                    params.append(filters["risk_level"])
+                if filters.get("contract_type"):
+                    where_clauses.append("con.contract_type = %s")
+                    params.append(filters["contract_type"])
+
+            where_sql = " AND ".join(where_clauses)
+
+            sql = f"""
+            SELECT
+                c.id, c.extracted_text, c.contract_id, c.clause_type,
+                c.page_number, c.risk_level, c.section_reference,
+                con.filename as contract_filename,
+                1 - (ce.embedding <=> %s::vector) AS score
+            FROM clause_embeddings ce
+            JOIN clauses c ON c.id = ce.clause_id
+            JOIN contracts con ON con.id = c.contract_id
+            WHERE {where_sql}
+            ORDER BY ce.embedding <=> %s::vector ASC
+            LIMIT %s
+            """
+
+            # Add vector parameter (appears twice)
+            params.append(embedding_str)
+            params.append(embedding_str)
+            params.append(self.VECTOR_LIMIT)
+
+            cursor = self.db.cursor()
+            cursor.execute(sql, params)
+            results = cursor.fetchall()
+
+            # Convert to list of dicts
+            vector_results = [
+                {
+                    "id": r[0],
+                    "extracted_text": r[1],
+                    "contract_id": r[2],
+                    "clause_type": r[3],
+                    "page_number": r[4],
+                    "risk_level": r[5],
+                    "section_reference": r[6],
+                    "contract_filename": r[7],
+                    "score": max(0.0, r[8]) if r[8] is not None else 0.0,  # Convert distance to similarity
+                }
+                for r in results
+            ]
+
+            return vector_results
+
+        except Exception as e:
+            # Log error but don't fail the entire search
+            import logging
+            logging.error(f"Vector search error: {e}")
+            return []
 
     def _embed_query(self, query: str) -> list[float]:
         """
         Generate query embedding using voyage-law-2.
         Returns 1024-dimensional vector optimized for legal text retrieval.
-        """
-        # In production:
-        # response = self.embedding_client.embed(
-        #     texts=[query],
-        #     model="voyage-law-2",
-        #     input_type="query",  # Different from "document" - asymmetric embedding
-        # )
-        # return response.embeddings[0]
 
-        return [0.0] * 1024  # Placeholder
+        Uses asymmetric embedding with input_type="query" which differs from
+        "document" type used for clause embeddings.
+        """
+        if not self.embedding_client or not query:
+            # Return zero vector as fallback
+            return [0.0] * 1024
+
+        try:
+            response = self.embedding_client.embed(
+                texts=[query],
+                model="voyage-law-2",
+                input_type="query",  # Asymmetric - different from document type
+            )
+            if response and response.embeddings:
+                return response.embeddings[0]
+            else:
+                return [0.0] * 1024
+        except Exception as e:
+            # Log error but return fallback
+            import logging
+            logging.error(f"Embedding error: {e}")
+            return [0.0] * 1024
 
     def _reciprocal_rank_fusion(
         self,
@@ -196,24 +323,77 @@ class HybridSearch:
         if not candidates:
             return []
 
-        # In production:
-        # documents = [c["data"]["extracted_text"] for c in candidates]
-        # response = self.rerank_client.rerank(
-        #     model="rerank-english-v3.0",
-        #     query=query,
-        #     documents=documents,
-        #     top_n=self.FINAL_LIMIT,
-        # )
-        #
-        # return [
-        #     SearchResult(
-        #         clause_id=candidates[r.index]["data"]["id"],
-        #         contract_id=candidates[r.index]["data"]["contract_id"],
-        #         ...
-        #         relevance_score=r.relevance_score,
-        #         match_method="hybrid",
-        #     )
-        #     for r in response.results
-        # ]
+        try:
+            if self.rerank_client:
+                # Extract text from candidates for reranking
+                documents = [c["data"]["extracted_text"] for c in candidates]
 
-        return []
+                response = self.rerank_client.rerank(
+                    model="rerank-english-v3.0",
+                    query=query,
+                    documents=documents,
+                    top_n=self.FINAL_LIMIT,
+                )
+
+                results = []
+                for rerank_result in response.results:
+                    candidate = candidates[rerank_result.index]
+                    data = candidate["data"]
+                    methods = candidate.get("methods", ["hybrid"])
+
+                    results.append(SearchResult(
+                        clause_id=data["id"],
+                        contract_id=data["contract_id"],
+                        contract_filename=data.get("contract_filename", ""),
+                        clause_type=data.get("clause_type", ""),
+                        text=data.get("extracted_text", ""),
+                        page_number=data.get("page_number", 0),
+                        section_reference=data.get("section_reference"),
+                        risk_level=data.get("risk_level", "low"),
+                        relevance_score=rerank_result.relevance_score,
+                        match_method="hybrid",
+                    ))
+                return results
+            else:
+                # Fallback: convert candidates to SearchResults without reranking
+                results = []
+                for candidate in candidates[:self.FINAL_LIMIT]:
+                    data = candidate["data"]
+                    methods = candidate.get("methods", ["hybrid"])
+
+                    results.append(SearchResult(
+                        clause_id=data["id"],
+                        contract_id=data["contract_id"],
+                        contract_filename=data.get("contract_filename", ""),
+                        clause_type=data.get("clause_type", ""),
+                        text=data.get("extracted_text", ""),
+                        page_number=data.get("page_number", 0),
+                        section_reference=data.get("section_reference"),
+                        risk_level=data.get("risk_level", "low"),
+                        relevance_score=data.get("score", 0.5),
+                        match_method="/".join(methods) if methods else "hybrid",
+                    ))
+                return results
+
+        except Exception as e:
+            # Log error but return fallback
+            import logging
+            logging.error(f"Reranking error: {e}")
+
+            # Fallback: return candidates as-is
+            results = []
+            for candidate in candidates[:self.FINAL_LIMIT]:
+                data = candidate["data"]
+                results.append(SearchResult(
+                    clause_id=data["id"],
+                    contract_id=data["contract_id"],
+                    contract_filename=data.get("contract_filename", ""),
+                    clause_type=data.get("clause_type", ""),
+                    text=data.get("extracted_text", ""),
+                    page_number=data.get("page_number", 0),
+                    section_reference=data.get("section_reference"),
+                    risk_level=data.get("risk_level", "low"),
+                    relevance_score=data.get("score", 0.5),
+                    match_method="hybrid",
+                ))
+            return results

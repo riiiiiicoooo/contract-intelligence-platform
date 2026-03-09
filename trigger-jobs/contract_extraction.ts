@@ -224,7 +224,7 @@ Return results as a JSON array of clause objects. Only include clauses that are 
 
   try {
     const response = await client.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 8000,
       messages: [
         {
@@ -551,7 +551,7 @@ export const contractExtractionTask = task<ExtractionPayload, ExtractionResult>(
           tokens_input: tokenCount.input,
           tokens_output: tokenCount.output,
           latency_ms: Date.now() - startTime,
-          model_used: "claude-3-5-sonnet-20241022",
+          model_used: "claude-sonnet-4-20250514",
         },
       };
 
@@ -633,9 +633,51 @@ function identifyConflicts(
 }
 
 function identifyInconsistencies(
-  _currentClauses: ExtractedClause[],
-  _otherContracts: Record<string, unknown>[]
+  currentClauses: ExtractedClause[],
+  otherContracts: Record<string, unknown>[]
 ): Record<string, unknown>[] {
-  // Simplified inconsistency detection
-  return [];
+  // Detect inconsistent definitions or terminology across contracts
+  const inconsistencies: Record<string, unknown>[] = [];
+
+  // Check for termination clauses with different notice periods
+  const terminationClauses = currentClauses.filter(
+    (c) => c.clause_type === "termination_convenience" || c.clause_type === "termination_cause"
+  );
+
+  if (terminationClauses.length > 0 && otherContracts.length > 0) {
+    // Extract notice periods if mentioned (simplified pattern matching)
+    const noticePeriods = terminationClauses.map((clause) => {
+      const match = clause.extracted_text.match(/(\d+)\s*day/i);
+      return match ? parseInt(match[1], 10) : null;
+    });
+
+    const uniquePeriods = [...new Set(noticePeriods.filter((p) => p !== null))];
+    if (uniquePeriods.length > 1) {
+      inconsistencies.push({
+        type: "termination_notice_inconsistency",
+        severity: "medium",
+        message: `Inconsistent termination notice periods detected: ${uniquePeriods.join(", ")} days`,
+        affected_clauses: terminationClauses.map((c) => c.clause_type),
+      });
+    }
+  }
+
+  // Check for party name inconsistencies
+  const partyMentions = currentClauses.map((clause) => {
+    // Simple extraction of party names from clauses
+    const matches = clause.extracted_text.match(/(?:Company|Client|Vendor|Provider|Contractor)[\s\w]*/gi);
+    return matches || [];
+  });
+
+  const uniquePartyNames = [...new Set(partyMentions.flat())];
+  if (uniquePartyNames.length > 2) {
+    inconsistencies.push({
+      type: "party_definition_inconsistency",
+      severity: "medium",
+      message: `Multiple party name variations detected: ${uniquePartyNames.slice(0, 5).join(", ")}`,
+      recommendation: "Standardize party definitions across all contracts in the deal",
+    });
+  }
+
+  return inconsistencies;
 }

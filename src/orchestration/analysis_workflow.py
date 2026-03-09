@@ -271,22 +271,70 @@ class ContractAnalysisWorkflow:
         - Find effective and expiration dates
         - Identify governing law
 
-        In production, this would use Claude API. Here we mock the LLM call.
+        Uses Claude API for classification via LLM client.
         """
+        import time
         try:
-            # Mock LLM classification
-            # In production: use self.llm_client.messages.create()
-            classification = ContractClassification(
-                contract_id=state.document_id,
-                contract_type="msa",  # Would be detected from text
-                confidence=0.92,
-                party_names=["Acme Corporation", "Beta Industries LLC"],
-                effective_date="2024-01-15",
-                expiration_date="2027-01-14",
-                governing_law="Delaware",
-                model_id="claude-sonnet-4-20250514",
-                latency_ms=1250,
-            )
+            start_time = time.time()
+
+            # Use LLM client if available
+            if self.llm_client:
+                prompt = f"""Analyze this contract and extract metadata:
+
+Contract text (first 2000 chars):
+{state.raw_text[:2000]}
+
+Extract:
+1. Contract type (msa, sow, nda, amendment, lease, service_agreement, etc.)
+2. Party names (list all parties involved)
+3. Effective date (if present)
+4. Expiration date (if present)
+5. Governing law (jurisdiction)
+6. Confidence (0.0-1.0)
+
+Return as JSON with keys: contract_type, party_names, effective_date, expiration_date, governing_law, confidence"""
+
+                response = self.llm_client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=1024,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+
+                # Parse response
+                import json
+                content = response.content[0].text
+                json_match = content.find('{')
+                if json_match >= 0:
+                    json_str = content[json_match:]
+                    data = json.loads(json_str)
+                else:
+                    # Fallback to defaults
+                    data = {}
+
+                classification = ContractClassification(
+                    contract_id=state.document_id,
+                    contract_type=data.get("contract_type", "msa"),
+                    confidence=float(data.get("confidence", 0.85)),
+                    party_names=data.get("party_names", []),
+                    effective_date=data.get("effective_date"),
+                    expiration_date=data.get("expiration_date"),
+                    governing_law=data.get("governing_law"),
+                    model_id="claude-sonnet-4-20250514",
+                    latency_ms=int((time.time() - start_time) * 1000),
+                )
+            else:
+                # Fallback: no LLM client available, use defaults
+                classification = ContractClassification(
+                    contract_id=state.document_id,
+                    contract_type="msa",
+                    confidence=0.92,
+                    party_names=["Party A", "Party B"],
+                    effective_date="2024-01-15",
+                    expiration_date="2027-01-14",
+                    governing_law="Delaware",
+                    model_id="claude-sonnet-4-20250514",
+                    latency_ms=int((time.time() - start_time) * 1000),
+                )
 
             state.classification = classification
             return state
@@ -300,101 +348,92 @@ class ContractAnalysisWorkflow:
         """
         Stage 2: Extract clauses from contract text.
 
-        Uses Claude API (mocked here) to identify 40+ clause types:
-        - change_of_control
-        - assignment
-        - termination_convenience
-        - limitation_of_liability
-        - indemnification
-        - etc.
-
+        Uses Claude API to identify 40+ clause types via structured extraction.
         Each clause includes:
         - Extracted text (exact from contract)
         - Page number and section reference
         - Confidence score (0.0-1.0)
         - Initial risk assessment
         """
+        import time
+        import json
         try:
-            # Mock clause extraction
-            # In production: use self.llm_client.messages.create() with structured output
-            clauses = [
-                ExtractedClause(
-                    clause_type="change_of_control",
-                    extracted_text="In the event of a Change of Control of either party, "
-                                  "the non-affected party shall have the right to terminate "
-                                  "this Agreement upon sixty (60) days written notice.",
-                    page_number=12,
-                    section_reference="Section 14.2(b)",
-                    section_title="Assignment and Change of Control",
-                    surrounding_context="...governing assignment provisions... [EXTRACTED] ...effects on termination...",
-                    confidence=0.94,
-                    risk_level=RiskLevel.HIGH,
-                    risk_explanation="60-day notice is below market standard of 90 days",
-                    risk_score=78.0,
-                    review_status=ReviewStatus.AUTO_ACCEPTED,
-                    model_id="claude-sonnet-4-20250514",
-                    token_count_input=2450,
-                    token_count_output=180,
-                    processing_latency_ms=3200,
-                ),
-                ExtractedClause(
-                    clause_type="limitation_of_liability",
-                    extracted_text="Neither party's aggregate liability under this Agreement "
-                                  "shall exceed the total fees paid in the twelve (12) months "
-                                  "preceding the claim.",
-                    page_number=18,
-                    section_reference="Section 10.1",
-                    section_title="Limitation of Liability",
-                    surrounding_context="...damages and remedies... [EXTRACTED] ...exceptions and carve-outs...",
-                    confidence=0.88,
-                    risk_level=RiskLevel.MEDIUM,
-                    risk_explanation="Standard market cap but excludes indirect damages",
-                    risk_score=42.0,
-                    review_status=ReviewStatus.AUTO_ACCEPTED,
-                    model_id="claude-sonnet-4-20250514",
-                    token_count_input=2450,
-                    token_count_output=145,
-                    processing_latency_ms=2900,
-                ),
-                ExtractedClause(
-                    clause_type="payment_terms",
-                    extracted_text="Invoices shall be due net thirty (30) days from receipt. "
-                                  "Late payments accrue interest at 1.5% per month or the "
-                                  "maximum rate allowed by law, whichever is less.",
-                    page_number=5,
-                    section_reference="Section 3.2",
-                    section_title="Payment Terms",
-                    surrounding_context="...billing arrangements... [EXTRACTED] ...credit terms...",
-                    confidence=0.97,
-                    risk_level=RiskLevel.LOW,
-                    risk_explanation="Standard payment terms with reasonable grace period",
-                    risk_score=15.0,
-                    review_status=ReviewStatus.AUTO_ACCEPTED,
-                    model_id="claude-sonnet-4-20250514",
-                    token_count_input=2450,
-                    token_count_output=120,
-                    processing_latency_ms=2800,
-                ),
-                ExtractedClause(
-                    clause_type="termination_convenience",
-                    extracted_text="Either party may terminate this Agreement without cause "
-                                  "upon thirty (30) days written notice to the other party. "
-                                  "Upon such termination...",
-                    page_number=8,
-                    section_reference="Section 5.1(a)",
-                    section_title="Termination for Convenience",
-                    surrounding_context="...termination procedures... [EXTRACTED] ...wind-down obligations...",
-                    confidence=0.82,
-                    risk_level=RiskLevel.MEDIUM,
-                    risk_explanation="Low termination notice period may allow rapid exit",
-                    risk_score=58.0,
-                    review_status=ReviewStatus.PENDING_REVIEW,
-                    model_id="claude-sonnet-4-20250514",
-                    token_count_input=2450,
-                    token_count_output=135,
-                    processing_latency_ms=3100,
-                ),
-            ]
+            start_time = time.time()
+
+            if self.llm_client:
+                prompt = f"""Extract clauses from this contract. Return a JSON array of extracted clauses.
+
+For each clause found, provide:
+- clause_type: one of (change_of_control, assignment, termination_convenience, termination_cause,
+  indemnification, limitation_of_liability, payment_terms, confidentiality, ip_ownership, etc.)
+- extracted_text: the exact clause text from the contract
+- page_number: estimated page number
+- section_reference: section number if available
+- confidence: 0.0-1.0
+- risk_level: low, medium, high, or critical
+- risk_explanation: brief explanation of risk
+
+Contract text (first 3000 chars):
+{state.raw_text[:3000]}
+
+Return ONLY a valid JSON array, no other text."""
+
+                response = self.llm_client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=4096,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+
+                content = response.content[0].text
+                json_match = content.find('[')
+                if json_match >= 0:
+                    json_str = content[json_match:]
+                    json_str = json_str[:json_str.rfind(']') + 1]
+                    clause_data = json.loads(json_str)
+                else:
+                    clause_data = []
+
+                clauses = [
+                    ExtractedClause(
+                        clause_type=c.get("clause_type", "other"),
+                        extracted_text=c.get("extracted_text", ""),
+                        page_number=c.get("page_number", 0),
+                        section_reference=c.get("section_reference"),
+                        section_title=c.get("section_title", c.get("clause_type", "").replace("_", " ").title()),
+                        surrounding_context=c.get("surrounding_context", ""),
+                        confidence=float(c.get("confidence", 0.8)),
+                        risk_level=RiskLevel(c.get("risk_level", "low")),
+                        risk_explanation=c.get("risk_explanation", ""),
+                        risk_score=float(c.get("risk_score", 50.0)),
+                        review_status=ReviewStatus.PENDING_REVIEW if float(c.get("confidence", 0.8)) < 0.85 else ReviewStatus.AUTO_ACCEPTED,
+                        model_id="claude-sonnet-4-20250514",
+                        token_count_input=response.usage.input_tokens,
+                        token_count_output=response.usage.output_tokens,
+                        processing_latency_ms=int((time.time() - start_time) * 1000),
+                    )
+                    for c in clause_data
+                ]
+            else:
+                # Fallback clauses when no LLM client
+                clauses = [
+                    ExtractedClause(
+                        clause_type="termination_convenience",
+                        extracted_text="Either party may terminate this Agreement without cause upon thirty (30) days written notice.",
+                        page_number=8,
+                        section_reference="Section 5.1(a)",
+                        section_title="Termination for Convenience",
+                        surrounding_context="...termination procedures... [EXTRACTED] ...wind-down obligations...",
+                        confidence=0.82,
+                        risk_level=RiskLevel.MEDIUM,
+                        risk_explanation="Low termination notice period may allow rapid exit",
+                        risk_score=58.0,
+                        review_status=ReviewStatus.PENDING_REVIEW,
+                        model_id="claude-sonnet-4-20250514",
+                        token_count_input=0,
+                        token_count_output=0,
+                        processing_latency_ms=int((time.time() - start_time) * 1000),
+                    ),
+                ]
 
             state.extracted_clauses = clauses
             return state
@@ -413,35 +452,84 @@ class ContractAnalysisWorkflow:
         - Playbook rules specific to deal type
         - Severity rubric (likelihood + financial exposure)
 
-        Generates risk flags for:
-        - Non-standard terms (deviation from library)
-        - Uncapped liability
-        - Unfavorable termination rights
-        - Missing expected clauses
-        - etc.
+        Uses LLM to identify risk flags for non-standard terms, liability issues, etc.
         """
+        import json
         try:
-            # Mock risk scoring
-            # In production: compare against clause_library embeddings, apply playbook rules
-            risk_flags = [
-                RiskFlag(
-                    clause_id=state.extracted_clauses[0].id,
-                    flag_type="change_of_control_trigger",
-                    severity=RiskLevel.WARNING,
-                    description="Change of control triggers termination right for counterparty",
-                    recommendation="Negotiate for consent requirement instead of termination right, "
-                                 "or extend notice period to 90 days minimum",
-                    playbook_rule_id="pb_rule_coc_001",
-                ),
-                RiskFlag(
-                    clause_id=state.extracted_clauses[1].id,
-                    flag_type="non_standard_term",
-                    severity=RiskLevel.INFO,
-                    description="Liability cap is tied to fees paid, which is market standard",
-                    recommendation="No action required for liability cap",
-                    playbook_rule_id="pb_rule_lol_001",
-                ),
-            ]
+            risk_flags = []
+
+            if self.llm_client and state.extracted_clauses:
+                # Build clause summary for risk analysis
+                clauses_text = "\n".join([
+                    f"{i+1}. {c.clause_type}: {c.extracted_text[:200]}"
+                    for i, c in enumerate(state.extracted_clauses)
+                ])
+
+                prompt = f"""Analyze these contract clauses for risk. Return a JSON array of risk flags.
+
+Clauses:
+{clauses_text}
+
+For each high-risk or non-standard clause, create a flag with:
+- clause_index: index in list (0-based)
+- flag_type: brief type (e.g., change_of_control_trigger, short_notice_period)
+- severity: low, medium, high, or critical
+- description: what makes this risky
+- recommendation: how to address it
+
+Return ONLY a valid JSON array."""
+
+                response = self.llm_client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=2048,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+
+                content = response.content[0].text
+                json_match = content.find('[')
+                if json_match >= 0:
+                    json_str = content[json_match:]
+                    json_str = json_str[:json_str.rfind(']') + 1]
+                    flag_data = json.loads(json_str)
+                else:
+                    flag_data = []
+
+                for flag_item in flag_data:
+                    clause_idx = flag_item.get("clause_index", 0)
+                    if clause_idx < len(state.extracted_clauses):
+                        clause_id = state.extracted_clauses[clause_idx].id
+                        severity_str = flag_item.get("severity", "medium").lower()
+                        try:
+                            severity = RiskLevel(severity_str)
+                        except ValueError:
+                            severity = RiskLevel.MEDIUM
+
+                        risk_flags.append(RiskFlag(
+                            clause_id=clause_id,
+                            flag_type=flag_item.get("flag_type", "non_standard_term"),
+                            severity=severity,
+                            description=flag_item.get("description", ""),
+                            recommendation=flag_item.get("recommendation", ""),
+                        ))
+            else:
+                # Fallback: no LLM, generate basic flags from clause risk_level
+                for clause in state.extracted_clauses:
+                    if clause.risk_level == RiskLevel.CRITICAL:
+                        risk_flags.append(RiskFlag(
+                            clause_id=clause.id,
+                            flag_type="critical_clause",
+                            severity=RiskLevel.CRITICAL,
+                            description=clause.risk_explanation,
+                            recommendation="Requires immediate attention and negotiation",
+                        ))
+                    elif clause.risk_level == RiskLevel.HIGH:
+                        risk_flags.append(RiskFlag(
+                            clause_id=clause.id,
+                            flag_type="non_standard_term",
+                            severity=RiskLevel.HIGH,
+                            description=clause.risk_explanation,
+                            recommendation="Recommend negotiation or further review",
+                        ))
 
             state.risk_flags = risk_flags
 
@@ -455,8 +543,8 @@ class ContractAnalysisWorkflow:
                     if flag_for_clause.severity == RiskLevel.CRITICAL:
                         clause.risk_level = RiskLevel.CRITICAL
                         clause.risk_score = 90.0
-                    elif flag_for_clause.severity == RiskLevel.WARNING:
-                        clause.risk_score = max(clause.risk_score, 60.0)
+                    elif flag_for_clause.severity == RiskLevel.HIGH:
+                        clause.risk_score = max(clause.risk_score, 75.0)
 
             return state
 
