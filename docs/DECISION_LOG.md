@@ -425,3 +425,62 @@ Claude's structured output and reasoning chains performed better on nested condi
 
 **Consequences:**
 - Increased API costs by ~35%. Required building a clause complexity classifier (2 weeks). Need to maintain prompt templates for both models. But partner trust increased — "Now when I see a red flag, I actually believe it."
+
+---
+
+## DEC-014: Multi-Model Routing with Claude as Primary (Accuracy-Driven Pivot)
+
+**Date:** October 2024
+**Status:** Accepted (supersedes single-model approach)
+**Decider:** Jacob George (PM), Engineering Lead
+
+**Context:**
+
+DEC-001 established multi-model architecture in theory but V1 implementation launched with GPT-4 as the default model. This was chosen because: (1) initial testing favored GPT-4's 89% accuracy on contract extraction, (2) faster latency, (3) lower API costs, and (4) team comfort with OpenAI's API.
+
+For the first 2 months, all extractions used GPT-4. Associates ran the platform on real deals and provided feedback: "The red flags are good, but we're finding errors on the complex stuff."
+
+**What Happened:**
+
+Post-launch analysis revealed accuracy degradation on specific clause types:
+- **Indemnification clauses:** 78% accuracy (GPT-4). These are critical risk provisions (associates will spend hours analyzing them). 22% error rate was unacceptable.
+- **Full-contract extraction:** GPT-4 achieved 89% F1 overall, but individual clause categories ranged from 71% (indemnity) to 95% (assignment).
+
+The turning point: a partner ran a structured benchmark. The team extracted 50 sample indemnification clauses using both Claude and GPT-4 against human-reviewed ground truth:
+- **Claude:** 94% accuracy
+- **GPT-4:** 78% accuracy
+- **Difference:** 16 percentage points on a single critical clause type
+
+Additionally, Claude's structured output mode (JSON schema validation) prevented hallucinated fields that GPT-4 occasionally produced.
+
+**Decision:**
+
+Implemented multi-model routing (per DEC-001) with Claude as primary model for all extraction. GPT-4 relegated to fallback (high-latency scenario where Claude API is unavailable) and specific clause type routing (rare cases where GPT-4 outperforms).
+
+**Implementation:**
+- Clause type classifier (built in 1 week) analyzes incoming contract and routes complex clauses to Claude, simple ones to either model
+- Results show: full-contract accuracy improved from 89% to 93% F1
+- Indemnification accuracy improved from 78% to 94%
+- API costs increased ~25% (Claude 3.5 Opus is more expensive) but offset by reduced associate review time
+
+**Rationale:**
+
+1. **Accuracy is non-negotiable:** One missed indemnification clause in a $50M deal can expose the client to unlimited liability. 78% accuracy → 94% accuracy is not a marginal improvement; it's the difference between a usable product and a liability.
+
+2. **Claude's structured reasoning:** Claude's chain-of-thought reasoning in extraction tasks produces fewer hallucinations than GPT-4's more direct outputs. On indemnity clauses, Claude traces through conditions ("if breach occurs AND damage exceeds $X AND within Y years, then..."), producing correct conditional logic.
+
+3. **Cost-benefit:** Yes, Claude costs 25% more per API call. But this saves associates 2-3 hours per 50-contract deal in review time. At $200/hour labor cost, that's $400-600 saved per deal. The $30 additional API cost is a rounding error.
+
+4. **Reversibility:** Multi-model routing allows testing hypotheses. Can A/B test Claude vs. GPT-4 on real deals. If GPT-4 improves in future, can re-enable it for specific use cases.
+
+**Consequences:**
+
+- **Short-term:** Rewrote extraction pipeline to support multi-model routing (2 weeks). Required building clause complexity classifier. Need to maintain dual prompt templates (what works for Claude doesn't always work for GPT-4).
+- **Long-term:** Claude becomes primary dependency. Binding ourselves to Anthropic API (mitigated by having fallback, but still a vendor risk). Cost scales with contract volume.
+- **Trust:** Partner feedback improved significantly. "The accuracy feels real now" and "We're catching things we would have missed" indicate the 16pp improvement in indemnification accuracy is noticeable in practice.
+
+**Lesson:**
+
+Optimize for the hardest case, not the average case. GPT-4's 89% average accuracy looked good on dashboards, but the 71% accuracy on indemnification clauses (the most critical provision) was a product killer. Claude's 94% on the hard cases justified the cost increase.
+
+---
